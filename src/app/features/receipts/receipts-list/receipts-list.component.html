@@ -29,6 +29,7 @@
         <table class="table">
           <thead>
             <tr>
+              <th>Type</th>
               <th>Invoice #</th>
               <th>Customer</th>
               <th>Grand total</th>
@@ -38,12 +39,25 @@
           <tbody>
             @for (r of filteredItems(); track r.id) {
               <tr class="row-click" (click)="openReceipt(r)">
-                <td class="mono">{{ r.invoiceNumber }}</td>
+                <td>
+                  <p-tag
+                    [value]="receiptTypeLabel(r)"
+                    [severity]="r.type === 'refund' ? 'warn' : 'success'"
+                  />
+                </td>
+                <td class="mono">
+                  {{ r.invoiceNumber }}
+                  @if (r.originalInvoiceNumber) {
+                    <div class="cell-sub muted">↳ {{ r.originalInvoiceNumber }}</div>
+                  }
+                </td>
                 <td>
                   <div class="cell-main">{{ displayCustomer(r.customer) }}</div>
                   <div class="cell-sub muted">{{ r.customer.address || '—' }}</div>
                 </td>
-                <td class="mono">{{ r.totals.grandTotal | number: '1.2-2' }}</td>
+                <td class="mono" [class.amount-negative]="r.totals.grandTotal < 0">
+                  {{ r.totals.grandTotal | number: '1.2-2' }}
+                </td>
                 <td class="muted">{{ r.createdAt ? (r.createdAt | date: 'medium') : '—' }}</td>
               </tr>
             }
@@ -67,9 +81,26 @@
     <div class="detail-top">
       <div class="detail-meta">
         <div class="meta-row">
+          <span class="meta-label">Type</span>
+          <span class="meta-value">
+            <p-tag
+              [value]="receiptTypeLabel(r)"
+              [severity]="r.type === 'refund' ? 'warn' : 'success'"
+            />
+          </span>
+        </div>
+        <div class="meta-row">
           <span class="meta-label">Invoice #</span>
           <span class="meta-value mono">{{ r.invoiceNumber }}</span>
         </div>
+        @if (r.originalInvoiceNumber) {
+          <div class="meta-row">
+            <span class="meta-label">Original</span>
+            <button type="button" class="link-btn mono" (click)="openOriginalReceipt(r.originalReceiptId)">
+              {{ r.originalInvoiceNumber }}
+            </button>
+          </div>
+        }
         <div class="meta-row">
           <span class="meta-label">Date/time</span>
           <span class="meta-value muted">{{ r.createdAt ? (r.createdAt | date: 'medium') : '—' }}</span>
@@ -105,11 +136,15 @@
     <div class="totals-grid">
       <div class="total-box">
         <span class="total-label">Grand total</span>
-        <strong class="mono">{{ r.totals.grandTotal | number: '1.2-2' }}</strong>
+        <strong class="mono" [class.amount-negative]="r.totals.grandTotal < 0">
+          {{ r.totals.grandTotal | number: '1.2-2' }}
+        </strong>
       </div>
       <div class="total-box">
         <span class="total-label">Paid</span>
-        <strong class="mono">{{ r.totals.paidAmount | number: '1.2-2' }}</strong>
+        <strong class="mono" [class.amount-negative]="r.totals.paidAmount < 0">
+          {{ r.totals.paidAmount | number: '1.2-2' }}
+        </strong>
       </div>
       <div class="total-box">
         <span class="total-label">Remaining</span>
@@ -138,11 +173,118 @@
               <td class="mono">{{ l.unitPrice | number: '1.2-2' }}</td>
               <td class="mono">{{ l.discountPercent | number: '1.0-2' }}</td>
               <td class="mono">{{ l.taxPercent | number: '1.0-2' }}</td>
-              <td class="mono">{{ receiptLineTotal(l) | number: '1.2-2' }}</td>
+              <td class="mono" [class.amount-negative]="receiptLineTotal(l) < 0">
+                {{ receiptLineTotal(l) | number: '1.2-2' }}
+              </td>
             </tr>
           }
         </tbody>
       </table>
+    </div>
+
+    @if (canRefundSelected()) {
+      <div class="detail-actions">
+        <p-button
+          type="button"
+          label="Refund"
+          icon="pi pi-undo"
+          severity="warn"
+          (onClick)="openRefundModal()"
+        />
+      </div>
+    }
+  }
+</p-dialog>
+
+<p-dialog
+  header="Process refund"
+  [visible]="showRefundModal()"
+  (visibleChange)="showRefundModal.set($event)"
+  [modal]="true"
+  [closable]="true"
+  [style]="{ width: '40rem', maxWidth: '96vw' }"
+  (onHide)="closeRefundModal()"
+>
+  @if (selectedReceipt(); as original) {
+    <p class="refund-hint muted">
+      Select products to refund from invoice <strong class="mono">{{ original.invoiceNumber }}</strong>.
+      Quantities already refunded are excluded automatically.
+    </p>
+
+    <div class="refund-list">
+      @for (row of refundLines(); let i = $index; track row.lineIndex) {
+        <div
+          class="refund-item"
+          [class.selected]="row.selected"
+          [class.disabled]="row.refundableQty <= 0"
+          (click)="toggleRefundLine(i)"
+        >
+          <div class="refund-item-check">
+            <span class="check-icon" [class.checked]="row.selected">✓</span>
+          </div>
+          <div class="refund-item-body">
+            <div class="refund-item-top">
+              <span class="refund-item-name">{{ row.line.productName }}</span>
+              @if (row.refundableQty <= 0) {
+                <span class="refund-badge muted">Fully refunded</span>
+              } @else if (row.alreadyRefunded > 0) {
+                <span class="refund-badge">{{ row.alreadyRefunded | number: '1.0-4' }} already refunded</span>
+              }
+            </div>
+            <div class="refund-item-meta muted">
+              Sold: {{ row.originalQty | number: '1.0-4' }} {{ row.line.unitLabel || '' }}
+              · Remaining: {{ row.refundableQty | number: '1.0-4' }}
+            </div>
+            @if (row.selected && row.refundableQty > 0) {
+              <div class="refund-item-qty" (click)="$event.stopPropagation()">
+                <span class="qty-label">Refund qty</span>
+                <button type="button" class="qty-btn" (click)="adjustRefundQty(i, -refundQtyStep(row))">−</button>
+                <input
+                  class="qty-input"
+                  type="number"
+                  [value]="row.refundQty"
+                  [step]="refundQtyStep(row)"
+                  min="0"
+                  [max]="row.refundableQty"
+                  (focus)="onRefundQtyFocus($event)"
+                  (input)="onRefundQtyInput(i, $event)"
+                  (blur)="onRefundQtyBlur(i, $event)"
+                />
+                <button type="button" class="qty-btn" (click)="adjustRefundQty(i, refundQtyStep(row))">+</button>
+                <span class="qty-unit muted">{{ row.line.unitLabel || '' }}</span>
+                <span class="refund-line-total mono" [class.amount-negative]="refundLinePreviewTotal(row) < 0">
+                  {{ refundLinePreviewTotal(row) | number: '1.2-2' }}
+                </span>
+              </div>
+            }
+          </div>
+        </div>
+      }
+    </div>
+
+    <div class="refund-summary">
+      <span>Refund total</span>
+      <strong class="mono amount-negative">{{ refundPreviewGrandTotal() | number: '1.2-2' }}</strong>
+    </div>
+
+    <div class="refund-actions">
+      <p-button
+        type="button"
+        [label]="refunding() ? 'Processing…' : 'Confirm refund'"
+        icon="pi pi-check"
+        severity="warn"
+        [loading]="refunding()"
+        [disabled]="refunding() || !hasRefundSelection()"
+        (onClick)="confirmRefund()"
+      />
+      <p-button
+        type="button"
+        label="Cancel"
+        severity="secondary"
+        [outlined]="true"
+        [disabled]="refunding()"
+        (onClick)="closeRefundModal()"
+      />
     </div>
   }
 </p-dialog>

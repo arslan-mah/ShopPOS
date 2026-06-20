@@ -173,3 +173,192 @@
   font-weight: 700;
   margin-bottom: 0.5rem;
 }
+
+.amount-negative {
+  color: #c0392b;
+}
+
+.link-btn {
+  border: none;
+  background: transparent;
+  color: var(--p-primary-color, #0ea5e9);
+  cursor: pointer;
+  font-weight: 600;
+  padding: 0;
+  text-decoration: underline;
+}
+
+.detail-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--app-border);
+}
+
+.refund-hint {
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.refund-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 360px;
+  overflow-y: auto;
+  margin-bottom: 1rem;
+}
+
+.refund-item {
+  display: flex;
+  gap: 0.65rem;
+  padding: 0.75rem;
+  border: 1px solid var(--app-border);
+  border-radius: 0.55rem;
+  background: var(--app-toolbar-bg);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+
+  &:hover:not(.disabled) {
+    border-color: color-mix(in srgb, var(--p-primary-color, #0ea5e9) 40%, var(--app-border));
+  }
+
+  &.selected {
+    border-color: color-mix(in srgb, #f59e0b 55%, var(--app-border));
+    background: color-mix(in srgb, #f59e0b 8%, var(--app-toolbar-bg));
+  }
+
+  &.disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+}
+
+.refund-item-check {
+  flex-shrink: 0;
+  padding-top: 0.1rem;
+}
+
+.check-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  border: 1px solid var(--app-border);
+  border-radius: 0.3rem;
+  font-size: 0.75rem;
+  color: transparent;
+
+  &.checked {
+    color: #fff;
+    background: #f59e0b;
+    border-color: #f59e0b;
+  }
+}
+
+.refund-item-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.refund-item-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.refund-item-name {
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.refund-badge {
+  font-size: 0.72rem;
+  white-space: nowrap;
+}
+
+.refund-item-meta {
+  font-size: 0.78rem;
+  margin-top: 0.2rem;
+}
+
+.refund-item-qty {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.qty-label {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--app-muted);
+}
+
+.qty-btn {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--app-border);
+  border-radius: 0.35rem;
+  background: var(--app-main-bg);
+  cursor: pointer;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.qty-val {
+  min-width: 2.5rem;
+  text-align: center;
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.qty-input {
+  width: 5rem;
+  padding: 0.35rem 0.45rem;
+  border: 1px solid var(--app-border);
+  border-radius: 0.35rem;
+  background: var(--app-main-bg);
+  color: var(--app-text);
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: center;
+  font-family: ui-monospace, monospace;
+
+  &:focus {
+    outline: none;
+    border-color: color-mix(in srgb, #f59e0b 55%, var(--app-border));
+  }
+}
+
+.qty-unit {
+  font-size: 0.78rem;
+}
+
+.refund-line-total {
+  margin-left: auto;
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.refund-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1rem;
+  background: var(--app-table-row-alt);
+  border-radius: 0.5rem;
+  margin-bottom: 1rem;
+  font-size: 1rem;
+}
+
+.refund-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}

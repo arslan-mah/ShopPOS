@@ -180,7 +180,7 @@ export class ProductsService {
     for (const line of lines) {
       const p = byId.get(line.productId);
       if (!p) continue;
-      const units = soldQuantityToBaseUnits(p, line.quantity, line.unitLabel);
+      const units = soldQuantityToBaseUnits(p, Math.abs(line.quantity), line.unitLabel);
       deductedByProduct.set(p.id, (deductedByProduct.get(p.id) ?? 0) + units);
     }
 
@@ -188,6 +188,26 @@ export class ProductsService {
       const p = byId.get(id);
       if (!p || deduct <= 0) continue;
       const next = Math.max(0, p.stockInBaseUnit - deduct);
+      await this.updateStock(id, next);
+    }
+  }
+
+  /** Restore stock after a refund (negative-quantity receipt lines). */
+  async restoreStockForReceiptLines(lines: ReceiptLineItem[], products: Product[]): Promise<void> {
+    const byId = new Map(products.map((p) => [p.id, p]));
+    const restoredByProduct = new Map<string, number>();
+
+    for (const line of lines) {
+      const p = byId.get(line.productId);
+      if (!p) continue;
+      const units = soldQuantityToBaseUnits(p, Math.abs(line.quantity), line.unitLabel);
+      restoredByProduct.set(p.id, (restoredByProduct.get(p.id) ?? 0) + units);
+    }
+
+    for (const [id, restore] of restoredByProduct) {
+      const p = byId.get(id);
+      if (!p || restore <= 0) continue;
+      const next = p.stockInBaseUnit + restore;
       await this.updateStock(id, next);
     }
   }
