@@ -12,14 +12,16 @@ import { TagModule } from 'primeng/tag';
 import { AuthService } from '../../core/auth/auth.service';
 import { mapDataErrorMessage } from '../../core/firebase/map-data-error-message';
 import { Customer, CustomersService } from '../customers/customers.service';
-import { Product, ProductsService } from '../products/products.service';
+import { Product, ProductsService, soldQuantityToBaseUnits } from '../products/products.service';
 import {
-  ReceiptCustomerMode,
   ReceiptCustomerRef,
   ReceiptDraft,
   ReceiptLineItem,
   ReceiptsService,
 } from '../receipts/receipts.service';
+
+const DEFAULT_SHOP_NAME = 'My Shop';
+const DEFAULT_SHOP_ADDRESS = '';
 
 type CartLine = {
   productId: string;
@@ -80,6 +82,7 @@ export class HomeComponent {
   readonly products = signal<Product[]>([]);
   readonly customers = signal<Customer[]>([]);
   readonly productSearch = signal('');
+  readonly customerSearch = signal('');
 
   readonly cart = signal<CartLine[]>([]);
 
@@ -88,7 +91,6 @@ export class HomeComponent {
   private readonly quantityInputRef = viewChild<ElementRef<HTMLInputElement>>('quantityInput');
 
   readonly showCheckoutModal = signal(false);
-  readonly customerMode = signal<ReceiptCustomerMode>('registered');
   readonly selectedCustomerId = signal<string | null>(null);
 
   readonly productForm = this.fb.nonNullable.group({
@@ -99,13 +101,6 @@ export class HomeComponent {
   });
 
   readonly checkoutForm = this.fb.nonNullable.group({
-    shopName: ['My Shop', [Validators.required, Validators.maxLength(200)]],
-    shopAddress: ['', [Validators.required, Validators.maxLength(1000)]],
-    customerSearch: [''],
-    guestFullName: [''],
-    guestAddress: [''],
-    guestPhone: [''],
-    guestCnic: [''],
     paidAmount: [0, [Validators.min(0)]],
     paymentMethod: ['cash', [Validators.maxLength(50)]],
   });
@@ -118,17 +113,23 @@ export class HomeComponent {
   });
 
   readonly filteredCustomers = computed(() => {
-    const q = this.checkoutForm.controls.customerSearch.value.trim().toLowerCase();
-    const all = this.customers();
-    if (!q) return all.slice(0, 8);
-    return all
+    const q = this.customerSearch().trim().toLowerCase();
+    if (!q) return [];
+    return this.customers()
       .filter(
         (c) =>
           (c.fullName || '').toLowerCase().includes(q) ||
           (c.address || '').toLowerCase().includes(q) ||
-          (c.phone || '').toLowerCase().includes(q),
+          (c.phone || '').toLowerCase().includes(q) ||
+          (c.cnic || '').toLowerCase().includes(q),
       )
-      .slice(0, 8);
+      .slice(0, 12);
+  });
+
+  readonly selectedCustomer = computed(() => {
+    const id = this.selectedCustomerId();
+    if (!id) return null;
+    return this.customers().find((c) => c.id === id) ?? null;
   });
 
   readonly cartGrandTotal = computed(() =>
@@ -171,6 +172,50 @@ export class HomeComponent {
       });
   }
 
+  productDisplayPrice(p: Product): number {
+    return this.defaultUnitPrice(p);
+  }
+
+  productSellableQuantity(p: Product): number {
+    if (p.type === 'count') {
+      return Math.floor(p.stockInBaseUnit);
+    }
+    const cf = p.conversionFactor > 0 ? p.conversionFactor : 1;
+    return p.stockInBaseUnit / cf;
+  }
+
+  isProductOutOfStock(p: Product): boolean {
+    return p.stockInBaseUnit <= 0;
+  }
+
+  isProductLowStock(p: Product): boolean {
+    if (p.stockInBaseUnit <= 0) return false;
+    return p.stockInBaseUnit <= p.lowStockThreshold;
+  }
+
+  stockBadgeLabel(p: Product): string {
+    if (this.isProductOutOfStock(p)) return 'OUT OF STOCK';
+    if (this.isProductLowStock(p)) return 'LOW STOCK';
+    const qty = Math.floor(this.productSellableQuantity(p));
+    return `${qty} IN STOCK`;
+  }
+
+  stockBadgeClass(p: Product): string {
+    if (this.isProductOutOfStock(p)) return 'badge-out';
+    if (this.isProductLowStock(p)) return 'badge-low';
+    return 'badge-in';
+  }
+
+  availableQtyInSellingUnit(p: Product): number {
+    const inCart = this.cart()
+      .filter((l) => l.productId === p.id)
+      .reduce((sum, l) => sum + soldQuantityToBaseUnits(p, l.quantity, l.unitLabel), 0);
+    const remainingBase = Math.max(0, p.stockInBaseUnit - inCart);
+    if (p.type === 'count') return Math.floor(remainingBase);
+    const cf = p.conversionFactor > 0 ? p.conversionFactor : 1;
+    return remainingBase / cf;
+  }
+
   productPriceLabel(p: Product): string {
     if (p.type === 'count') {
       const ppc = Math.max(1, p.piecesPerCarton);
@@ -205,6 +250,7 @@ export class HomeComponent {
   }
 
   openProductModal(p: Product): void {
+    if (this.isProductOutOfStock(p)) return;
     this.selectedProduct.set(p);
     this.productForm.reset({
       quantity: 1,
@@ -258,13 +304,25 @@ export class HomeComponent {
     }
     const v = this.productForm.getRawValue();
     const step = this.defaultQuantityStep(p);
+    const available = this.availableQtyInSellingUnit(p);
+    const qty = Math.max(step, v.quantity);
+
+    if (available <= 0) {
+      this.error.set(`${p.name} is out of stock.`);
+      return;
+    }
+    if (qty > available) {
+      this.error.set(`Only ${available} ${this.unitLabel(p)} available for ${p.name}.`);
+      return;
+    }
+
     const existing = this.cart().findIndex((l) => l.productId === p.id);
 
     const line: CartLine = {
       productId: p.id,
       productName: p.name,
       unitPrice: Math.max(0, v.unitPrice),
-      quantity: Math.max(step, v.quantity),
+      quantity: qty,
       quantityStep: step,
       discountPercent: Math.max(0, v.discountPercent),
       taxPercent: Math.max(0, v.taxPercent),
@@ -274,9 +332,15 @@ export class HomeComponent {
     if (existing >= 0) {
       const next = [...this.cart()];
       const cur = next[existing];
+      const combined = cur.quantity + line.quantity;
+      const maxAvailable = this.availableQtyInSellingUnit(p) + cur.quantity;
+      if (combined > maxAvailable) {
+        this.error.set(`Only ${Math.floor(maxAvailable)} ${this.unitLabel(p)} available for ${p.name}.`);
+        return;
+      }
       next[existing] = {
         ...cur,
-        quantity: cur.quantity + line.quantity,
+        quantity: combined,
         unitPrice: line.unitPrice,
         discountPercent: line.discountPercent,
         taxPercent: line.taxPercent,
@@ -299,7 +363,20 @@ export class HomeComponent {
     const next = [...this.cart()];
     const l = next[index];
     if (!l) return;
-    next[index] = { ...l, quantity: Math.max(l.quantityStep, l.quantity + delta) };
+
+    const p = this.products().find((x) => x.id === l.productId);
+    if (!p) return;
+
+    const step = l.quantityStep;
+    const proposed = l.quantity + delta;
+    const maxQty = this.availableQtyInSellingUnit(p) + l.quantity;
+    const clamped = Math.min(maxQty, Math.max(step, proposed));
+
+    if (clamped <= 0) {
+      next.splice(index, 1);
+    } else {
+      next[index] = { ...l, quantity: clamped };
+    }
     this.cart.set(next);
   }
 
@@ -314,6 +391,8 @@ export class HomeComponent {
       return;
     }
     this.error.set(null);
+    this.selectedCustomerId.set(null);
+    this.customerSearch.set('');
     this.checkoutForm.patchValue({
       paidAmount: this.cartGrandTotal(),
     });
@@ -328,43 +407,38 @@ export class HomeComponent {
     this.selectedCustomerId.set(id);
     const c = this.customers().find((x) => x.id === id);
     if (c) {
-      this.checkoutForm.patchValue({ customerSearch: c.fullName });
+      this.customerSearch.set([c.fullName, c.phone, c.address].filter(Boolean).join(' · '));
     }
   }
 
+  clearSelectedCustomer(): void {
+    this.selectedCustomerId.set(null);
+    this.customerSearch.set('');
+  }
+
+  onCustomerSearchInput(value: string): void {
+    this.selectedCustomerId.set(null);
+    this.customerSearch.set(value);
+  }
+
   private buildCustomerRef(): ReceiptCustomerRef {
-    if (this.customerMode() === 'registered') {
-      const id = this.selectedCustomerId();
-      const c = this.customers().find((x) => x.id === id);
-      if (!c || !id) {
-        return { mode: 'guest', fullName: '', address: '', phone: '', cnic: '' };
-      }
-      return {
-        mode: 'registered',
-        customerId: id,
-        fullName: c.fullName || '',
-        address: c.address || '',
-        phone: c.phone || '',
-        cnic: c.cnic || '',
-      };
+    const id = this.selectedCustomerId();
+    const c = this.customers().find((x) => x.id === id);
+    if (!c || !id) {
+      return { mode: 'guest', fullName: '', address: '', phone: '', cnic: '' };
     }
-    const v = this.checkoutForm.getRawValue();
     return {
-      mode: 'guest',
-      fullName: v.guestFullName.trim(),
-      address: v.guestAddress.trim(),
-      phone: v.guestPhone.trim(),
-      cnic: v.guestCnic.trim(),
+      mode: 'registered',
+      customerId: id,
+      fullName: c.fullName || '',
+      address: c.address || '',
+      phone: c.phone || '',
+      cnic: c.cnic || '',
     };
   }
 
   async completeCheckout(): Promise<void> {
     if (this.cart().length === 0) return;
-    if (this.checkoutForm.controls.shopName.invalid || this.checkoutForm.controls.shopAddress.invalid) {
-      this.checkoutForm.markAllAsTouched();
-      this.error.set('Shop name and address are required.');
-      return;
-    }
 
     const grandTotal = this.cartGrandTotal();
     const paidAmount = Math.max(0, this.checkoutForm.controls.paidAmount.value);
@@ -381,8 +455,8 @@ export class HomeComponent {
     }));
 
     const draft: ReceiptDraft = {
-      shopName: this.checkoutForm.controls.shopName.value,
-      shopAddress: this.checkoutForm.controls.shopAddress.value,
+      shopName: DEFAULT_SHOP_NAME,
+      shopAddress: DEFAULT_SHOP_ADDRESS,
       invoiceNumber: generateInvoiceNumber(),
       customer: this.buildCustomerRef(),
       lines,

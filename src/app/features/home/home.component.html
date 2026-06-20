@@ -24,10 +24,21 @@
       } @else {
         <div class="product-grid">
           @for (p of filteredProducts(); track p.id) {
-            <button type="button" class="product-card" (click)="openProductModal(p)">
+            <button
+              type="button"
+              class="product-card"
+              [class.out-of-stock]="isProductOutOfStock(p)"
+              [disabled]="isProductOutOfStock(p)"
+              (click)="openProductModal(p)"
+            >
+              <span class="stock-badge" [class]="stockBadgeClass(p)">{{ stockBadgeLabel(p) }}</span>
               <span class="product-name">{{ p.name }}</span>
-              <span class="product-price">{{ productPriceLabel(p) }}</span>
-              <span class="product-stock muted">Stock: {{ productStockLabel(p) }}</span>
+              <div class="product-card-footer">
+                <span class="product-price">Rs. {{ productDisplayPrice(p) | number: '1.0-2' }}</span>
+                @if (!isProductOutOfStock(p)) {
+                  <span class="add-icon" aria-hidden="true">+</span>
+                }
+              </div>
             </button>
           }
         </div>
@@ -152,55 +163,40 @@
       <strong>{{ cartGrandTotal() | number: '1.2-2' }}</strong>
     </div>
 
-    <div class="field-row">
-      <label class="field">
-        <span class="label">Shop name</span>
-        <input class="input" type="text" formControlName="shopName" />
-      </label>
-      <label class="field">
-        <span class="label">Shop address</span>
-        <input class="input" type="text" formControlName="shopAddress" placeholder="Street, City…" />
-      </label>
-    </div>
+    <div class="section-label">Customer (optional)</div>
+    <label class="field">
+      <span class="label">Search customer</span>
+      <input
+        class="input"
+        type="search"
+        placeholder="Name, phone, address, CNIC…"
+        [value]="customerSearch()"
+        (input)="onCustomerSearchInput($any($event.target).value || '')"
+      />
+    </label>
 
-    <div class="section-label">Customer</div>
-    <div class="mode-btns">
-      <button type="button" class="mode-btn" [class.active]="customerMode() === 'registered'" (click)="customerMode.set('registered')">
-        Existing customer
-      </button>
-      <button type="button" class="mode-btn" [class.active]="customerMode() === 'guest'" (click)="customerMode.set('guest')">
-        Guest
-      </button>
-    </div>
-
-    @if (customerMode() === 'registered') {
-      <label class="field">
-        <span class="label">Search customer</span>
-        <input class="input" type="text" formControlName="customerSearch" placeholder="Name, phone, address…" />
-      </label>
+    @if (selectedCustomer(); as c) {
+      <div class="selected-customer">
+        <div>
+          <span class="pick-name">{{ c.fullName }}</span>
+          <span class="pick-sub muted">{{ c.phone || '—' }} · {{ c.address || '—' }}</span>
+        </div>
+        <button type="button" class="clear-customer" (click)="clearSelectedCustomer()">Clear</button>
+      </div>
+    } @else if (filteredCustomers().length > 0) {
       <div class="pick-list">
         @for (c of filteredCustomers(); track c.id) {
-          <button type="button" class="pick-item" [class.selected]="selectedCustomerId() === c.id" (click)="selectCustomer(c.id)">
+          <button type="button" class="pick-item" (click)="selectCustomer(c.id)">
             <span class="pick-name">{{ c.fullName }}</span>
-            <span class="pick-sub muted">{{ c.phone || c.address || '—' }}</span>
+            <span class="pick-sub muted">
+              {{ c.phone || '—' }} · {{ c.address || '—' }}
+              @if (c.cnic) { · {{ c.cnic }} }
+            </span>
           </button>
         }
       </div>
-    } @else {
-      <div class="field-row">
-        <label class="field">
-          <span class="label">Name (optional)</span>
-          <input class="input" type="text" formControlName="guestFullName" />
-        </label>
-        <label class="field">
-          <span class="label">Phone (optional)</span>
-          <input class="input" type="tel" formControlName="guestPhone" />
-        </label>
-        <label class="field field-full">
-          <span class="label">Address (optional)</span>
-          <input class="input" type="text" formControlName="guestAddress" />
-        </label>
-      </div>
+    } @else if (customerSearch().trim()) {
+      <p class="search-hint muted">No customers found in your shop records.</p>
     }
 
     <div class="field-row">
