@@ -1,8 +1,224 @@
-<div class="page">
-  <p-card header="Welcome" subheader="Your shop dashboard" styleClass="home-card">
-    <p class="lead">
-      This is your shop home. Use the sidebar to manage <strong>products</strong> and <strong>customers</strong>, or add
-      dashboard widgets here later.
-    </p>
-  </p-card>
+<div class="pos-page">
+  @if (error()) {
+    <p-message severity="error" [text]="error()!" [closable]="false" styleClass="msg-banner" />
+  }
+
+  <div class="pos-layout">
+    <!-- Products (4 parts) -->
+    <section class="pos-products">
+      <div class="section-head">
+        <h2 class="section-title">Products</h2>
+        <input
+          class="search-input"
+          type="search"
+          placeholder="Search products…"
+          [value]="productSearch()"
+          (input)="productSearch.set($any($event.target).value || '')"
+        />
+      </div>
+
+      @if (loading() && products().length === 0) {
+        <div class="state-empty">Loading products…</div>
+      } @else if (filteredProducts().length === 0) {
+        <div class="state-empty">No products found. Add products from the Products menu.</div>
+      } @else {
+        <div class="product-grid">
+          @for (p of filteredProducts(); track p.id) {
+            <button type="button" class="product-card" (click)="openProductModal(p)">
+              <span class="product-name">{{ p.name }}</span>
+              <span class="product-price">{{ productPriceLabel(p) }}</span>
+              <span class="product-stock muted">Stock: {{ productStockLabel(p) }}</span>
+            </button>
+          }
+        </div>
+      }
+    </section>
+
+    <!-- Cart (1 part) -->
+    <aside class="pos-cart">
+      <div class="cart-head">
+        <h2 class="section-title">Cart</h2>
+        <p-tag [value]="cart().length + ' items'" severity="info" />
+      </div>
+
+      @if (cart().length === 0) {
+        <div class="cart-empty muted">Tap a product to add it here.</div>
+      } @else {
+        <ul class="cart-list">
+          @for (line of cart(); let i = $index; track line.productId + '-' + i) {
+            <li class="cart-item">
+              <div class="cart-item-top">
+                <span class="cart-item-name">{{ line.productName }}</span>
+                <button type="button" class="cart-remove" (click)="removeFromCart(i)" aria-label="Remove">×</button>
+              </div>
+              <div class="cart-item-meta muted">
+                {{ line.quantity | number: '1.0-4' }} {{ line.unitLabel }} × {{ line.unitPrice | number: '1.2-2' }}
+              </div>
+              <div class="cart-item-qty">
+                <button type="button" class="qty-btn" (click)="adjustCartQty(i, -line.quantityStep)">−</button>
+                <span class="qty-val">{{ line.quantity | number: '1.0-4' }}</span>
+                <button type="button" class="qty-btn" (click)="adjustCartQty(i, line.quantityStep)">+</button>
+              </div>
+              <div class="cart-item-total">{{ cartLineTotal(i) | number: '1.2-2' }}</div>
+            </li>
+          }
+        </ul>
+      }
+
+      <div class="cart-footer">
+        <div class="cart-total-row">
+          <span>Grand total</span>
+          <strong class="cart-total">{{ cartGrandTotal() | number: '1.2-2' }}</strong>
+        </div>
+        <p-button
+          type="button"
+          label="Checkout"
+          icon="pi pi-shopping-cart"
+          styleClass="checkout-btn w-full"
+          [disabled]="cart().length === 0 || saving()"
+          (onClick)="openCheckout()"
+        />
+      </div>
+    </aside>
+  </div>
 </div>
+
+<!-- Add to cart modal -->
+<p-dialog
+  header="Add to cart"
+  [visible]="showProductModal()"
+  (visibleChange)="showProductModal.set($event)"
+  [modal]="true"
+  [closable]="true"
+  [style]="{ width: '28rem', maxWidth: '96vw' }"
+  (onHide)="closeProductModal()"
+>
+  @if (selectedProduct(); as p) {
+    <div class="modal-product-name">{{ p.name }}</div>
+    <p class="modal-hint muted">{{ productPriceLabel(p) }} · Stock: {{ productStockLabel(p) }}</p>
+
+    <form class="modal-form" [formGroup]="productForm" (ngSubmit)="confirmAddToCart()">
+      <label class="field">
+        <span class="label">Quantity ({{ unitLabel(p) }})</span>
+        <input class="input" type="number" formControlName="quantity" [step]="defaultQuantityStep(p)" min="0" />
+      </label>
+      <label class="field">
+        <span class="label">Unit price</span>
+        <input class="input" type="number" formControlName="unitPrice" min="0" step="0.01" />
+      </label>
+      <div class="field-row">
+        <label class="field">
+          <span class="label">Discount %</span>
+          <input class="input" type="number" formControlName="discountPercent" min="0" step="0.01" />
+        </label>
+        <label class="field">
+          <span class="label">Tax %</span>
+          <input class="input" type="number" formControlName="taxPercent" min="0" step="0.01" />
+        </label>
+      </div>
+      <div class="preview-total">
+        Line total: <strong>{{ previewLineTotal() | number: '1.2-2' }}</strong>
+      </div>
+      <div class="modal-actions">
+        <p-button type="submit" label="Add to cart" icon="pi pi-check" />
+        <p-button type="button" label="Cancel" severity="secondary" [outlined]="true" (onClick)="closeProductModal()" />
+      </div>
+    </form>
+  }
+</p-dialog>
+
+<!-- Checkout modal -->
+<p-dialog
+  header="Checkout"
+  [visible]="showCheckoutModal()"
+  (visibleChange)="showCheckoutModal.set($event)"
+  [modal]="true"
+  [closable]="true"
+  [style]="{ width: '40rem', maxWidth: '96vw' }"
+  (onHide)="closeCheckout()"
+>
+  <form class="modal-form" [formGroup]="checkoutForm" (ngSubmit)="completeCheckout()">
+    <div class="checkout-summary">
+      <span>Order total</span>
+      <strong>{{ cartGrandTotal() | number: '1.2-2' }}</strong>
+    </div>
+
+    <div class="field-row">
+      <label class="field">
+        <span class="label">Shop name</span>
+        <input class="input" type="text" formControlName="shopName" />
+      </label>
+      <label class="field">
+        <span class="label">Shop address</span>
+        <input class="input" type="text" formControlName="shopAddress" placeholder="Street, City…" />
+      </label>
+    </div>
+
+    <div class="section-label">Customer</div>
+    <div class="mode-btns">
+      <button type="button" class="mode-btn" [class.active]="customerMode() === 'registered'" (click)="customerMode.set('registered')">
+        Existing customer
+      </button>
+      <button type="button" class="mode-btn" [class.active]="customerMode() === 'guest'" (click)="customerMode.set('guest')">
+        Guest
+      </button>
+    </div>
+
+    @if (customerMode() === 'registered') {
+      <label class="field">
+        <span class="label">Search customer</span>
+        <input class="input" type="text" formControlName="customerSearch" placeholder="Name, phone, address…" />
+      </label>
+      <div class="pick-list">
+        @for (c of filteredCustomers(); track c.id) {
+          <button type="button" class="pick-item" [class.selected]="selectedCustomerId() === c.id" (click)="selectCustomer(c.id)">
+            <span class="pick-name">{{ c.fullName }}</span>
+            <span class="pick-sub muted">{{ c.phone || c.address || '—' }}</span>
+          </button>
+        }
+      </div>
+    } @else {
+      <div class="field-row">
+        <label class="field">
+          <span class="label">Name (optional)</span>
+          <input class="input" type="text" formControlName="guestFullName" />
+        </label>
+        <label class="field">
+          <span class="label">Phone (optional)</span>
+          <input class="input" type="tel" formControlName="guestPhone" />
+        </label>
+        <label class="field field-full">
+          <span class="label">Address (optional)</span>
+          <input class="input" type="text" formControlName="guestAddress" />
+        </label>
+      </div>
+    }
+
+    <div class="field-row">
+      <label class="field">
+        <span class="label">Paid amount</span>
+        <input class="input" type="number" formControlName="paidAmount" min="0" step="0.01" />
+      </label>
+      <label class="field">
+        <span class="label">Payment</span>
+        <select class="input select" formControlName="paymentMethod">
+          <option value="cash">Cash</option>
+          <option value="card">Card</option>
+          <option value="bank">Bank transfer</option>
+          <option value="other">Other</option>
+        </select>
+      </label>
+    </div>
+
+    <div class="modal-actions">
+      <p-button
+        type="submit"
+        [label]="saving() ? 'Creating receipt…' : 'Confirm & create receipt'"
+        icon="pi pi-receipt"
+        [loading]="saving()"
+        [disabled]="saving()"
+      />
+      <p-button type="button" label="Cancel" severity="secondary" [outlined]="true" [disabled]="saving()" (onClick)="closeCheckout()" />
+    </div>
+  </form>
+</p-dialog>

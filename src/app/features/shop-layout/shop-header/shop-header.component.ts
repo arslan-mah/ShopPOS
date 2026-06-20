@@ -49,14 +49,14 @@ export class ShopHeaderComponent {
     if (url.includes('/products')) return 'Products';
     if (url.includes('/customers')) return 'Customers';
     if (url.includes('/receipts')) return 'Receipts';
-    return 'Home';
+    return 'Point of Sale';
   }
 
   private subtitleFromUrl(url: string): string {
     if (url.includes('/products')) return 'Manage your product catalog';
     if (url.includes('/customers')) return 'Manage your customers';
     if (url.includes('/receipts')) return 'Create invoices and print-ready receipts';
-    return 'Dashboard and quick actions';
+    return 'Point of sale — sell products and checkout';
   }
 
   async signOut(): Promise<void> {
