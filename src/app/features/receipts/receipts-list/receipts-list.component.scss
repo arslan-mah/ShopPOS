@@ -1,0 +1,50 @@
+:host {
+  display: block;
+}
+
+.page {
+  padding: 2rem 2.5rem;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.list-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+}
+
+.filter {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-width: 320px;
+}
+
+.filter-label {
+  font-weight: 700;
+  font-size: 0.85rem;
+  color: var(--app-muted, #64748b);
+}
+
+.state-empty {
+  padding: 1.25rem 1rem;
+  border: 1px dashed var(--app-border, rgba(255, 255, 255, 0.15));
+  border-radius: 0.85rem;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.row-click {
+  cursor: pointer;
+}
+
+.btn-secondary {
+  padding: 0.65rem 1.1rem;
+  border-radius: 0.75rem;
+  border: 1px solid var(--app-border, rgba(255, 255, 255, 0.15));
+  background: transparent;
+  cursor: pointer;
+}
+

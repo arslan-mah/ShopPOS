@@ -1,0 +1,181 @@
+<div class="page">
+
+  <!-- Add customer button -->
+  <div class="add-btn-row">
+    <p-button
+      type="button"
+      label="Add New Customer"
+      icon="pi pi-user-plus"
+      styleClass="add-customer-btn"
+      (onClick)="showAddCustomerModal = true"
+    />
+  </div>
+
+  <!-- ── Add Customer Dialog ── -->
+  <p-dialog
+    header="Add Customer"
+    [(visible)]="showAddCustomerModal"
+    [modal]="true"
+    [closable]="true"
+    [dismissableMask]="true"
+    [style]="{width:'42rem', maxWidth:'96vw'}"
+    [contentStyle]="{padding:'0'}"
+    (onHide)="onModalClosed()"
+  >
+    <form class="form" [formGroup]="form" (ngSubmit)="addCustomer()">
+      <div class="form-body">
+
+        <!-- Full name -->
+        <label class="field field-full">
+          <span class="label">Full name <span class="req">*</span></span>
+          <input
+            pInputText
+            fluid
+            class="input w-full"
+            type="text"
+            formControlName="fullName"
+            autocomplete="name"
+            placeholder="e.g. Ahmed Raza"
+            [invalid]="form.controls.fullName.invalid && form.controls.fullName.touched"
+          />
+          @if (form.controls.fullName.touched && form.controls.fullName.errors?.['required']) {
+            <span class="hint err">Full name is required.</span>
+          }
+        </label>
+
+        <!-- Address -->
+        <label class="field field-full">
+          <span class="label">Address <span class="req">*</span></span>
+          <textarea
+            pTextarea
+            fluid
+            class="input w-full"
+            formControlName="address"
+            rows="2"
+            autocomplete="street-address"
+            placeholder="Street, City, Province…"
+            [invalid]="form.controls.address.invalid && form.controls.address.touched"
+          ></textarea>
+          @if (form.controls.address.touched && form.controls.address.errors?.['required']) {
+            <span class="hint err">Address is required.</span>
+          }
+        </label>
+
+        <!-- Phone & CNIC -->
+        <div class="form-row">
+          <label class="field">
+            <span class="label">Phone number <span class="opt">(optional)</span></span>
+            <input
+              pInputText
+              fluid
+              class="input w-full"
+              type="tel"
+              formControlName="phone"
+              autocomplete="tel"
+              placeholder="e.g. 0300-1234567"
+            />
+          </label>
+          <label class="field">
+            <span class="label">CNIC <span class="opt">(optional)</span></span>
+            <input
+              pInputText
+              fluid
+              class="input w-full"
+              type="text"
+              formControlName="cnic"
+              inputmode="numeric"
+              autocomplete="off"
+              placeholder="e.g. 12345-1234567-1"
+            />
+          </label>
+        </div>
+
+      </div><!-- /form-body -->
+
+      <!-- Footer actions -->
+      <div class="form-actions">
+        <p-button
+          type="submit"
+          [label]="saving() ? 'Saving…' : 'Add customer'"
+          [loading]="saving()"
+          [disabled]="saving()"
+          icon="pi pi-user-plus"
+        />
+        @if (!saving()) {
+          <p-button
+            type="button"
+            label="Cancel"
+            styleClass="p-button-secondary"
+            [outlined]="true"
+            (onClick)="showAddCustomerModal = false"
+          />
+        }
+      </div>
+    </form>
+
+    @if (error()) {
+      <p-message severity="error" [text]="error()!" [closable]="false" styleClass="msg-banner" />
+    }
+  </p-dialog>
+
+  <!-- ── Customers Card ── -->
+  <p-card styleClass="list-card">
+    <p-header>
+      <div class="list-header-inner">
+        <span class="list-title">Customers</span>
+        <p-tag value="Live" severity="success" />
+      </div>
+    </p-header>
+
+    @if (loading() && items().length === 0) {
+      <div class="state-empty">
+        <div class="state-empty-icon">👤</div>
+        <p>Loading customers…</p>
+      </div>
+    } @else if (items().length === 0) {
+      <div class="state-empty">
+        <div class="state-empty-icon">🗂️</div>
+        <p>No customers yet.<br />Click <strong>Add New Customer</strong> above to get started.</p>
+        <p style="margin-top: 0.5rem; font-size: 0.78rem;">Data is stored under <code>/customers</code>.</p>
+      </div>
+    } @else {
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Full name</th>
+              <th>Address</th>
+              <th>Phone</th>
+              <th>CNIC</th>
+              <th>Created</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (c of items(); track c.id) {
+              <tr>
+                <td class="name-cell">{{ c.fullName }}</td>
+                <td class="cell-address muted">{{ c.address || '—' }}</td>
+                <td>{{ c.phone || '—' }}</td>
+                <td class="mono">{{ c.cnic || '—' }}</td>
+                <td class="muted">{{ c.createdAt ? (c.createdAt | date: 'medium') : '—' }}</td>
+                <td class="actions">
+                  <p-button
+                    type="button"
+                    label="Delete"
+                    severity="danger"
+                    [outlined]="true"
+                    size="small"
+                    icon="pi pi-trash"
+                    (onClick)="deleteCustomer(c.id, c.fullName)"
+                  />
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </p-card>
+
+</div>

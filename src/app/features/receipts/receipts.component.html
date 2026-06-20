@@ -1,0 +1,341 @@
+<div class="page">
+  <div class="page-switcher">
+    <button type="button" class="btn-secondary" (click)="goToCreate()">
+      Create receipt
+    </button>
+    <button type="button" class="btn-primary" (click)="goToList()">
+      View all receipts
+    </button>
+  </div>
+
+  <p-card header="New receipt / invoice" subheader="Add products, adjust quantity, then save and print QR." styleClass="list-card">
+    <div class="receipt-top">
+      <div class="receipt-meta">
+        <div class="meta-row">
+          <span class="meta-label">Invoice #</span>
+          <span class="meta-value mono">{{ invoiceNumber() }}</span>
+        </div>
+        <div class="meta-row">
+          <span class="meta-label">QR</span>
+          <div class="qr-box">
+            @if (qrDataUrl()) {
+              <img class="qr-img" [src]="qrDataUrl()!" alt="QR code" />
+            } @else {
+              <span class="muted">—</span>
+            }
+          </div>
+        </div>
+      </div>
+    </div>
+
+    @if (error()) {
+      <p-message severity="error" [text]="error()!" [closable]="false" styleClass="msg-banner" />
+    }
+
+    <form class="form" [formGroup]="form" (ngSubmit)="saveReceipt()">
+      <div class="form-body">
+        <!-- Shop info -->
+        <div class="section-title">Shop name & address</div>
+        <div class="form-grid-2">
+          <label class="field">
+            <span class="label">Shop name <span class="req">*</span></span>
+            <input class="input" type="text" formControlName="shopName" placeholder="e.g. My Shop" />
+          </label>
+          <label class="field">
+            <span class="label">Shop address <span class="req">*</span></span>
+            <input class="input" type="text" formControlName="shopAddress" placeholder="Street, City…" />
+          </label>
+        </div>
+
+        <!-- Customer -->
+        <div class="section-title">Customer</div>
+        <div class="customer-mode">
+          <button
+            type="button"
+            class="mode-btn"
+            [class.mode-btn-active]="customerMode() === 'registered'"
+            (click)="customerMode.set('registered')"
+          >
+            Registered user
+          </button>
+          <button
+            type="button"
+            class="mode-btn"
+            [class.mode-btn-active]="customerMode() === 'guest'"
+            (click)="customerMode.set('guest')"
+          >
+            Guest
+          </button>
+        </div>
+
+        @if (customerMode() === 'registered') {
+          <label class="field field-full">
+            <span class="label">Search / select customer</span>
+            <input class="input" type="text" formControlName="customerSearch" placeholder="Type name or address…" />
+          </label>
+          <div class="pick-list">
+            @if (filteredCustomers().length === 0) {
+              <div class="pick-empty muted">No customers found.</div>
+            } @else {
+              @for (c of filteredCustomers(); track c.id) {
+                <button type="button" class="pick-item" (click)="selectedCustomerId.set(c.id)">
+                  <div class="pick-main">{{ c.fullName || '(no name)' }}</div>
+                  <div class="pick-sub muted">{{ c.address || '—' }}</div>
+                </button>
+              }
+            }
+          </div>
+          <div class="muted small-help">
+            Selected: <span class="mono">{{ selectedCustomerId() || '—' }}</span>
+          </div>
+        } @else {
+          <div class="form-grid-2">
+            <label class="field">
+              <span class="label">Full name <span class="opt">(optional)</span></span>
+              <input class="input" type="text" formControlName="guestFullName" placeholder="e.g. Ali" />
+            </label>
+            <label class="field">
+              <span class="label">Address <span class="opt">(optional)</span></span>
+              <input class="input" type="text" formControlName="guestAddress" placeholder="Street, City…" />
+            </label>
+            <label class="field">
+              <span class="label">Phone <span class="opt">(optional)</span></span>
+              <input class="input" type="tel" formControlName="guestPhone" placeholder="e.g. 0300-1234567" />
+            </label>
+            <label class="field">
+              <span class="label">CNIC <span class="opt">(optional)</span></span>
+              <input class="input" type="text" formControlName="guestCnic" placeholder="e.g. 12345-1234567-1" />
+            </label>
+          </div>
+        }
+
+        <!-- Products -->
+        <div class="section-title">Products</div>
+        <div class="product-add">
+          <label class="field field-full">
+            <span class="label">Search products</span>
+            <input class="input" type="text" formControlName="productSearch" placeholder="Type product name…" />
+          </label>
+          <div class="pick-list">
+            @if (filteredProducts().length === 0) {
+              <div class="pick-empty muted">No products found.</div>
+            } @else {
+              @for (p of filteredProducts(); track p.id) {
+                <div class="pick-row">
+                  <div class="pick-main">
+                    {{ p.name }}
+                    <span class="muted small-help">· {{ p.type === 'count' ? (p.piecesPerCarton + ' pieces/carton') : (p.sellingUnit) }}</span>
+                  </div>
+                  <button type="button" class="pick-add-btn" (click)="addProduct(p)">
+                    Add
+                  </button>
+                </div>
+              }
+            }
+          </div>
+        </div>
+
+        <div class="section-title">Receipt lines</div>
+        @if (lines().length === 0) {
+          <div class="state-empty">
+            Add products above to build your receipt.
+          </div>
+        } @else {
+          <div class="table-wrap">
+            <table class="table">
+              <thead>
+                <tr>
+                  <th style="min-width: 180px;">Product</th>
+                  <th style="width: 120px;">Qty</th>
+                  <th style="width: 140px;">Unit price</th>
+                  <th style="width: 140px;">Discount %</th>
+                  <th style="width: 120px;">Tax %</th>
+                  <th style="width: 140px;">Line total</th>
+                  <th style="width: 70px;"></th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (line of lines(); let i = $index; track line.productId + '-' + i) {
+                  <tr>
+                    <td>
+                      <div class="name-cell">{{ line.productName }}</div>
+                    </td>
+                    <td>
+                      <div class="qty-cell">
+                        <button type="button" class="qty-btn minus" (click)="adjustQuantity(i, -line.quantityStep)" aria-label="Decrease quantity">
+                          -
+                        </button>
+                      </div>
+                      <input
+                        class="input qty-input"
+                        type="number"
+                        [value]="line.quantity"
+                        [step]="line.quantityStep"
+                        (input)="setQuantity(i, $any($event.target).valueAsNumber)"
+                      />
+                      <div class="qty-actions">
+                        <button type="button" class="qty-btn plus" (click)="adjustQuantity(i, line.quantityStep)" aria-label="Increase quantity">
+                          +
+                        </button>
+                      </div>
+                    </td>
+                    <td class="muted">
+                      {{ line.unitPrice | number: '1.2-2' }}
+                    </td>
+                    <td>
+                      <input
+                        class="input"
+                        type="number"
+                        step="0.01"
+                        [value]="line.discountPercent"
+                        (input)="updateLine(i, { discountPercent: $any($event.target).valueAsNumber })"
+                      />
+                    </td>
+                    <td>
+                      <input
+                        class="input"
+                        type="number"
+                        step="0.01"
+                        [value]="line.taxPercent"
+                        (input)="updateLine(i, { taxPercent: $any($event.target).valueAsNumber })"
+                      />
+                    </td>
+                    <td class="mono">
+                      {{ lineTotalFor(i) | number: '1.2-2' }}
+                    </td>
+                    <td class="actions">
+                      <button type="button" class="icon-btn" (click)="removeLine(i)" aria-label="Remove line">
+                        ✕
+                      </button>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+
+        <!-- Totals & payment -->
+        <div class="section-title">Totals & payment</div>
+        <div class="totals-grid">
+          <div class="total-box">
+            <div class="total-label">Grand total</div>
+            <div class="total-value mono">{{ totals().grandTotal | number: '1.2-2' }}</div>
+          </div>
+          <div class="total-box">
+            <div class="total-label">Paid amount</div>
+            <div class="total-input">
+              <input class="input" type="number" min="0" step="any" formControlName="paidAmount" />
+            </div>
+          </div>
+          <div class="total-box">
+            <div class="total-label">Remaining</div>
+            <div class="total-value mono">{{ totals().remainingAmount | number: '1.2-2' }}</div>
+          </div>
+        </div>
+
+        <div class="form-grid-2">
+          <label class="field">
+            <span class="label">Payment method</span>
+            <select class="input select" formControlName="paymentMethod">
+              <option value="cash">Cash</option>
+              <option value="card">Card</option>
+              <option value="bank">Bank transfer</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
+          <div class="field">
+            <span class="label">Invoice date/time</span>
+            <div class="muted small-help">Stored with server timestamp on save.</div>
+          </div>
+        </div>
+
+        <div class="form-actions">
+          <button type="submit" class="btn-primary" [disabled]="saving()">
+            {{ saving() ? 'Saving…' : 'Save receipt' }}
+          </button>
+          <button type="button" class="btn-secondary" (click)="newReceipt()" [disabled]="saving()">New invoice</button>
+        </div>
+
+        <!-- Saved receipt preview -->
+        @if (showSavedPreview()) {
+          <div class="saved-preview">
+            <div class="section-title">Saved receipt</div>
+            <div class="saved-meta">
+              <div class="meta-row">
+                <span class="meta-label">Receipt ID</span>
+                <span class="meta-value mono">{{ savedReceiptId() }}</span>
+              </div>
+              <div class="meta-row">
+                <span class="meta-label">Invoice #</span>
+                <span class="meta-value mono">{{ invoiceNumber() }}</span>
+              </div>
+              <div class="meta-row">
+                <span class="meta-label">Date/time</span>
+                <span class="meta-value muted">{{ savedCreatedAt() ? (savedCreatedAt() | date: 'medium') : '—' }}</span>
+              </div>
+            </div>
+
+            <div class="form-grid-2" style="margin-top: 1rem;">
+              <div class="total-box">
+                <div class="total-label">Shop</div>
+                <div style="font-weight: 800; margin-top: 0.35rem;">{{ savedShopName() }}</div>
+                <div class="muted" style="margin-top: 0.35rem; white-space: pre-wrap;">{{ savedShopAddress() }}</div>
+              </div>
+              <div class="total-box">
+                <div class="total-label">Customer</div>
+                @if (savedCustomer()?.mode === 'registered') {
+                  <div style="font-weight: 800; margin-top: 0.35rem;">{{ savedCustomer()!.fullName }}</div>
+                  <div class="muted" style="margin-top: 0.35rem; white-space: pre-wrap;">
+                    {{ savedCustomer()!.address || '—' }}
+                  </div>
+                  <div class="muted" style="margin-top: 0.35rem;">
+                    Phone: {{ savedCustomer()!.phone || '—' }} · CNIC: {{ savedCustomer()!.cnic || '—' }}
+                  </div>
+                } @else if (savedCustomer()?.mode === 'guest') {
+                  <div style="font-weight: 800; margin-top: 0.35rem;">{{ savedCustomer()!.fullName || 'Guest customer' }}</div>
+                  <div class="muted" style="margin-top: 0.35rem; white-space: pre-wrap;">
+                    {{ savedCustomer()!.address || '—' }}
+                  </div>
+                  <div class="muted" style="margin-top: 0.35rem;">
+                    Phone: {{ savedCustomer()!.phone || '—' }} · CNIC: {{ savedCustomer()!.cnic || '—' }}
+                  </div>
+                } @else {
+                  <div class="muted" style="margin-top: 0.35rem;">—</div>
+                }
+              </div>
+            </div>
+
+            @if (savedTotals()) {
+              <div class="totals-grid" style="margin-top: 1rem;">
+                <div class="total-box">
+                  <div class="total-label">Grand total</div>
+                  <div class="total-value mono">{{ savedTotals()!.grandTotal | number: '1.2-2' }}</div>
+                </div>
+                <div class="total-box">
+                  <div class="total-label">Paid amount</div>
+                  <div class="total-value mono">{{ savedTotals()!.paidAmount | number: '1.2-2' }}</div>
+                </div>
+                <div class="total-box">
+                  <div class="total-label">Remaining</div>
+                  <div class="total-value mono">{{ savedTotals()!.remainingAmount | number: '1.2-2' }}</div>
+                </div>
+              </div>
+            }
+
+            <div class="muted small-help" style="margin-top: 0.75rem;">
+              Payment method: <span class="mono">{{ savedPaymentMethod() || 'cash' }}</span>
+            </div>
+
+            <div class="qr-row">
+              @if (qrDataUrl()) {
+                <img class="qr-img" [src]="qrDataUrl()!" alt="QR code" />
+              }
+            </div>
+          </div>
+        }
+      </div>
+    </form>
+  </p-card>
+</div>
+

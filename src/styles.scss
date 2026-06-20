@@ -1,1 +1,192 @@
-/* You can add global styles to this file, and also import other style files */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+/* --- Light theme (default) --- */
+:root {
+  color-scheme: light;
+  --app-shell-bg: #e8edf3;
+  --app-main-bg: #e8edf3;
+  --app-toolbar-bg: #ffffff;
+  --app-toolbar-text: #0f172a;
+  --app-toolbar-muted: #64748b;
+  --app-toolbar-border: #e2e8f0;
+  --app-toolbar-shadow: 0 1px 0 rgba(15, 23, 42, 0.06);
+  --app-user-chip-bg: #f1f5f9;
+  --app-user-chip-text: #475569;
+  --app-sidebar-bg: #0f172a;
+  --app-sidebar-border: rgba(255, 255, 255, 0.06);
+  --app-text: #0f172a;
+  --app-muted: #64748b;
+  --app-border: #e2e8f0;
+  --app-table-header-bg: #f1f5f9;
+  --app-table-row-alt: #fafbfc;
+  --app-row-warn-bg: #fffbeb;
+  --app-adjust-bg: #f8fafc;
+  --login-page-bg: linear-gradient(155deg, #f1f5f9 0%, #e2e8f0 50%, #cbd5e1 100%);
+}
+
+/* --- Dark theme --- */
+html.app-dark {
+  color-scheme: dark;
+  --app-shell-bg: #0b1120;
+  --app-main-bg: #0b1120;
+  --app-toolbar-bg: #111827;
+  --app-toolbar-text: #f1f5f9;
+  --app-toolbar-muted: #94a3b8;
+  --app-toolbar-border: #1f2937;
+  --app-toolbar-shadow: 0 1px 0 rgba(0, 0, 0, 0.35);
+  --app-user-chip-bg: #1e293b;
+  --app-user-chip-text: #cbd5e1;
+  --app-sidebar-bg: #020617;
+  --app-sidebar-border: rgba(255, 255, 255, 0.06);
+  --app-text: #f1f5f9;
+  --app-muted: #94a3b8;
+  --app-border: #1f2937;
+  --app-table-header-bg: #1e293b;
+  --app-table-row-alt: #0f172a;
+  --app-row-warn-bg: #422006;
+  --app-adjust-bg: #1e293b;
+  --login-page-bg: linear-gradient(155deg, #0f172a 0%, #1e293b 45%, #0f172a 100%);
+}
+
+html,
+body {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font-family: Roboto, system-ui, -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  background: var(--app-main-bg);
+  color: var(--app-text);
+}
+
+app-root {
+  display: block;
+  height: 100%;
+}
+
+/* PrimeNG cards — calmer padding */
+.p-card {
+  --p-card-body-padding: 1.15rem 1.35rem;
+  border: 1px solid var(--app-border);
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+html.app-dark .p-card {
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.35);
+}
+
+.p-card .p-card-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.list-header-inner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.list-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  color: var(--app-text);
+}
+
+.msg-banner {
+  display: block;
+  margin: 0 0 1rem;
+}
+
+/* Shared data tables (products / customers) */
+.table-wrap {
+  overflow-x: auto;
+  border-radius: 0.5rem;
+  border: 1px solid var(--app-border);
+}
+
+.table-wrap .table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.table-wrap .table th,
+.table-wrap .table td {
+  border-bottom: 1px solid var(--app-border);
+}
+
+.table-wrap .table th {
+  font-weight: 600;
+  text-align: left;
+  padding: 0.55rem 0.65rem;
+  background: var(--app-table-header-bg);
+  color: var(--app-muted);
+  white-space: nowrap;
+}
+
+.table-wrap .table td {
+  padding: 0.55rem 0.65rem;
+  vertical-align: top;
+  color: var(--app-text);
+}
+
+.table-wrap .table tbody tr:nth-child(even) td {
+  background: var(--app-table-row-alt);
+}
+
+.table-wrap .table tbody tr:hover td {
+  filter: brightness(0.98);
+}
+
+html.app-dark .table-wrap .table tbody tr:hover td {
+  filter: brightness(1.08);
+}
+
+.table-wrap .table tr.row-warning td {
+  background: var(--app-row-warn-bg) !important;
+}
+
+.table-wrap .table tr.adjust-row td {
+  padding: 0;
+  background: var(--app-adjust-bg) !important;
+  border-bottom: 1px solid var(--app-border);
+}
+
+.muted {
+  color: var(--app-muted);
+}
+
+code {
+  font-size: 0.85em;
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.25rem;
+  background: color-mix(in srgb, var(--app-muted) 12%, transparent);
+}
+
+/* Native inputs in feature forms (products, etc.) */
+.input,
+.select,
+.textarea {
+  border: 1px solid var(--app-border);
+  border-radius: 0.5rem;
+  background: var(--app-toolbar-bg);
+  color: var(--app-text);
+}
+
+.input:focus,
+.select:focus,
+.textarea:focus {
+  outline: none;
+  border-color: color-mix(in srgb, var(--p-primary-color, #0ea5e9) 55%, var(--app-border));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--p-primary-color, #0ea5e9) 18%, transparent);
+}

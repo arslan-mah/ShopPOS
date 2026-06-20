@@ -1,0 +1,62 @@
+:host {
+  display: block;
+  height: 100%;
+}
+
+.sidebar-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem 0.5rem 1.25rem;
+  min-height: 100%;
+  box-sizing: border-box;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.5rem 0.75rem 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  margin-bottom: 0.25rem;
+}
+
+.brand-mark {
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.5rem;
+  background: linear-gradient(135deg, #38bdf8, #6366f1);
+  flex-shrink: 0;
+}
+
+.brand-name {
+  font-weight: 600;
+  font-size: 1.05rem;
+  letter-spacing: -0.02em;
+  color: #f8fafc;
+}
+
+.nav-list {
+  padding-top: 0;
+}
+
+.nav-list a[mat-list-item] {
+  --mat-list-list-item-leading-icon-start-space: 12px;
+  border-radius: 0.5rem;
+  margin-bottom: 2px;
+  color: #94a3b8;
+
+  &.active-link {
+    color: #f8fafc;
+    background: rgba(56, 189, 248, 0.18);
+  }
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.06);
+  }
+}
+
+.nav-list mat-icon {
+  color: inherit;
+  opacity: 0.95;
+}

@@ -1,0 +1,423 @@
+<div class="page">
+  <!-- Add product button -->
+  <div class="add-btn-row" style="margin-bottom: 1.25rem; text-align: left;">
+    <p-button
+      type="button"
+      label="Add New Product"
+      icon="pi pi-plus"
+      styleClass="add-product-btn"
+      (onClick)="showAddProductModal = true"
+    />
+  </div>
+
+  <!-- ── Add Product Dialog ── -->
+  <p-dialog
+    header="Add Product"
+    [(visible)]="showAddProductModal"
+    [modal]="true"
+    [closable]="true"
+    [dismissableMask]="true"
+    [style]="{width:'46rem', maxWidth:'96vw'}"
+    [contentStyle]="{padding:'0'}"
+    (onHide)="onModalClosed()"
+  >
+    <form class="form" [formGroup]="form" (ngSubmit)="addProduct()">
+      <div class="form-body">
+
+        <!-- Name -->
+        <label class="field field-full">
+          <span class="label">Name <span class="req">*</span></span>
+          <input class="input" type="text" formControlName="name" autocomplete="off" placeholder="e.g. Organic Almonds" />
+        </label>
+
+        <!-- Product Kind -->
+        <div class="form-grid-2">
+          <label class="field">
+            <span class="label">Product kind <span class="req">*</span></span>
+            <select class="input select" formControlName="type" (change)="applyUnitTypePreset()">
+              @for (opt of unitTypes; track opt.value) {
+                <option [value]="opt.value">{{ opt.label }}</option>
+              }
+            </select>
+          </label>
+          <p class="hint-inline">
+            @if (form.controls.type.value === 'count') {
+              Enter how many pieces fit in one carton, then cartons in stock. Price can be per piece or per carton.
+            } @else {
+              Base vs selling unit (e.g. g→kg). Stock can be entered in either unit.
+            }
+          </p>
+        </div>
+
+        <!-- Count product fields -->
+        @if (form.controls.type.value === 'count') {
+          <div class="count-card card-inner">
+            <h3 class="sub-title">Cartons &amp; Pieces</h3>
+            <div class="form-grid-2">
+              <label class="field">
+                <span class="label">Pieces in one carton <span class="req">*</span></span>
+                <input class="input" type="number" formControlName="piecesPerCarton" min="1" step="1" placeholder="10" />
+                <span class="hint">e.g. 10 cookies per carton</span>
+              </label>
+              <label class="field">
+                <span class="label">Cartons in stock <span class="req">*</span></span>
+                <input class="input" type="number" formControlName="cartonsInStock" min="0" step="1" placeholder="0" />
+              </label>
+            </div>
+            <div class="preview-box inline-preview">
+              <span class="preview-label">Stock on hand</span>
+              <strong>
+                {{ previewStockInBase() | number: '1.0-0' }} pc
+                <span class="muted"> · </span>
+                {{ form.controls.cartonsInStock.value | number: '1.0-2' }} {{ form.controls.sellingUnit.value }}
+              </strong>
+            </div>
+
+            <h3 class="sub-title sub-title-spaced">Price</h3>
+            <div class="form-grid-2">
+              <label class="field">
+                <span class="label">I sell by <span class="req">*</span></span>
+                <select class="input select" formControlName="countPriceMode">
+                  <option value="piece">Price per piece</option>
+                  <option value="carton">Price per carton</option>
+                </select>
+              </label>
+              <label class="field">
+                <span class="label">Amount <span class="req">*</span></span>
+                <input class="input" type="number" formControlName="countPriceAmount" min="0" step="0.01" placeholder="0.00" />
+              </label>
+            </div>
+            <p class="price-preview muted">
+              Per piece: <strong>{{ previewPricePerPiece() | number: '1.2-2' }}</strong>
+              &nbsp;·&nbsp;
+              Per carton ({{ form.controls.piecesPerCarton.value || 0 }} pc):
+              <strong>{{ previewPricePerCarton() | number: '1.2-2' }}</strong>
+            </p>
+            <label class="field field-full">
+              <span class="label">Purchase price per piece</span>
+              <input class="input" type="number" formControlName="cost" min="0" step="0.01" placeholder="0.00" />
+              <span class="hint">What you pay to buy one piece (optional; for margin tracking)</span>
+            </label>
+
+            <h3 class="sub-title sub-title-spaced">Low Stock Alert</h3>
+            <div class="form-grid-2">
+              <label class="field">
+                <span class="label">Warn when below — measure in <span class="req">*</span></span>
+                <select class="input select" formControlName="lowStockInputMode">
+                  @for (opt of lowStockModeOptionsForForm(); track opt.value) {
+                    <option [value]="opt.value">{{ opt.label }}</option>
+                  }
+                </select>
+              </label>
+              <label class="field">
+                <span class="label">Threshold <span class="req">*</span></span>
+                <input class="input" type="number" formControlName="lowStockQuantity" min="0" step="any" placeholder="0" />
+              </label>
+            </div>
+            <div class="preview-box inline-preview">
+              <span class="preview-label">Alert when at or below</span>
+              <strong>
+                {{ previewLowStockInBase() | number: '1.0-0' }} pc
+                <span class="muted"> · </span>
+                {{ previewLowStockCartons() | number: '1.0-2' }} {{ form.controls.sellingUnit.value }}
+              </strong>
+            </div>
+          </div>
+
+        } @else {
+
+          <!-- Weight / Volume fields -->
+          <div class="form-grid-3">
+            <label class="field">
+              <span class="label">Base unit <span class="req">*</span></span>
+              <input class="input" type="text" formControlName="baseUnit" placeholder="g, ml…" />
+            </label>
+            <label class="field">
+              <span class="label">Selling unit <span class="req">*</span></span>
+              <input class="input" type="text" formControlName="sellingUnit" placeholder="kg, L…" />
+            </label>
+            <label class="field">
+              <span class="label">Conversion <span class="req">*</span></span>
+              <input class="input" type="number" formControlName="conversionFactor" min="0.0000001" step="any" />
+              <span class="hint">1 {{ form.controls.sellingUnit.value }} = this many {{ form.controls.baseUnit.value }}</span>
+            </label>
+          </div>
+
+          <div class="form-grid-3">
+            <label class="field">
+              <span class="label">Price per {{ form.controls.sellingUnit.value || 'selling unit' }} <span class="req">*</span></span>
+              <input class="input" type="number" formControlName="pricePerUnit" min="0" step="0.01" placeholder="0.00" />
+            </label>
+            <label class="field">
+              <span class="label">Purchase price per {{ form.controls.sellingUnit.value || 'selling unit' }}</span>
+              <input class="input" type="number" formControlName="cost" min="0" step="0.01" placeholder="0.00" />
+              <span class="hint">Purchase cost (optional)</span>
+            </label>
+          </div>
+
+          <div class="stock-entry card-inner">
+            <h3 class="sub-title">Low Stock Alert</h3>
+            <div class="form-grid-3">
+              <label class="field">
+                <span class="label">Warn when below — measure in <span class="req">*</span></span>
+                <select class="input select" formControlName="lowStockInputMode">
+                  @for (opt of lowStockModeOptionsForForm(); track opt.value) {
+                    <option [value]="opt.value">{{ opt.label }}</option>
+                  }
+                </select>
+              </label>
+              <label class="field">
+                <span class="label">Threshold <span class="req">*</span></span>
+                <input class="input" type="number" formControlName="lowStockQuantity" min="0" step="any" placeholder="0" />
+              </label>
+              <div class="preview-box">
+                <span class="preview-label">Stored as</span>
+                <strong>
+                  {{ previewLowStockInBase() | number: '1.0-4' }} {{ form.controls.baseUnit.value }}
+                  <span class="muted"> · </span>
+                  {{ previewLowStockInSelling() | number: '1.2-4' }} {{ form.controls.sellingUnit.value }}
+                </strong>
+              </div>
+            </div>
+          </div>
+
+          <div class="stock-entry card-inner">
+            <h3 class="sub-title">Initial Stock</h3>
+            <div class="form-grid-3">
+              <label class="field">
+                <span class="label">Measure stock in <span class="req">*</span></span>
+                <select class="input select" formControlName="stockInputMode">
+                  @for (opt of stockModeOptionsForForm(); track opt.value) {
+                    <option [value]="opt.value">{{ opt.label }}</option>
+                  }
+                </select>
+              </label>
+              <label class="field">
+                <span class="label">Quantity <span class="req">*</span></span>
+                <input class="input" type="number" formControlName="stockQuantity" min="0" step="any" placeholder="0" />
+              </label>
+              <div class="preview-box">
+                <span class="preview-label">Stored as</span>
+                <strong>
+                  {{ previewStockInBase() | number: '1.0-4' }} {{ form.controls.baseUnit.value }}
+                  <span class="muted"> · </span>
+                  {{ previewStockInSelling() | number: '1.2-4' }} {{ form.controls.sellingUnit.value }}
+                </strong>
+              </div>
+            </div>
+          </div>
+        }
+
+        <!-- Expiry -->
+        <div class="expiry-block">
+          <label class="checkbox-row">
+            <input type="checkbox" formControlName="hasExpiry" />
+            <span>Track expiry date</span>
+          </label>
+          @if (form.controls.hasExpiry.value) {
+            <label class="field field-date">
+              <span class="label">Expiry date <span class="req">*</span></span>
+              <input class="input" type="date" formControlName="expiryDate" />
+            </label>
+          }
+        </div>
+
+      </div><!-- /form-body -->
+
+      <!-- Footer actions -->
+      <div class="form-actions">
+        <p-button
+          type="submit"
+          [label]="saving() ? 'Saving…' : 'Add product'"
+          [loading]="saving()"
+          [disabled]="saving()"
+          icon="pi pi-plus"
+        />
+        @if (!saving()) {
+          <p-button
+            type="button"
+            label="Cancel"
+            styleClass="p-button-secondary"
+            [outlined]="true"
+            (onClick)="showAddProductModal = false"
+          />
+        }
+      </div>
+    </form>
+
+    @if (error()) {
+      <p-message severity="error" [text]="error()!" [closable]="false" styleClass="msg-banner" />
+    }
+  </p-dialog>
+
+  <!-- ── Products Card ── -->
+  <p-card styleClass="list-card">
+    <p-header>
+      <div class="list-header-inner">
+        <span class="list-title">Products</span>
+        <p-tag value="Live" severity="success" />
+      </div>
+    </p-header>
+
+    @if (loading() && items().length === 0) {
+      <div class="state-empty">
+        <div class="state-empty-icon">📦</div>
+        <p>Loading products…</p>
+      </div>
+    } @else if (items().length === 0) {
+      <div class="state-empty">
+        <div class="state-empty-icon">🗂️</div>
+        <p>No products yet.<br />Click <strong>Add New Product</strong> above to get started.</p>
+        <p style="margin-top: 0.5rem; font-size: 0.78rem;">Data is stored under <code>/products</code>.</p>
+      </div>
+    } @else {
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Units</th>
+              <th>Price</th>
+              <th>Cost</th>
+              <th>Stock</th>
+              <th>Low</th>
+              <th>Expiry</th>
+              <th>Created</th>
+              <th style="width: 150px;"></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (p of items(); track p.id) {
+              <tr [class.row-warning]="isLowStock(p)">
+                <td class="name-cell">{{ p.name }}</td>
+                <td class="cell-nowrap muted">{{ formatUnits(p) }}</td>
+                <td>
+                  @if (p.type === 'count') {
+                    {{ priceLineCount(p) }}
+                  } @else {
+                    {{ p.pricePerUnit | number: '1.2-2' }} / {{ p.sellingUnit }}
+                  }
+                </td>
+                <td class="muted">{{ costLine(p) }}</td>
+                <td>
+                  @if (p.type === 'count') {
+                    <span>{{ p.stockInBaseUnit | number: '1.0-0' }} pc</span>
+                    <span class="muted"> · </span>
+                    <span>{{ stockInCartons(p) | number: '1.0-2' }} {{ p.sellingUnit }}</span>
+                  } @else {
+                    <span>{{ p.stockInBaseUnit | number: '1.0-2' }} {{ p.baseUnit }}</span>
+                    <span class="muted"> · </span>
+                    <span>{{ stockInSellingUnit(p) | number: '1.2-4' }} {{ p.sellingUnit }}</span>
+                  }
+                </td>
+                <td class="muted">
+                  @if (p.lowStockThreshold <= 0) {
+                    —
+                  } @else if (p.type === 'count') {
+                    <span>{{ p.lowStockThreshold | number: '1.0-0' }} pc</span>
+                    <span class="muted"> · </span>
+                    <span>{{ lowStockInCartons(p) | number: '1.0-2' }} {{ p.sellingUnit }}</span>
+                  } @else {
+                    <span>{{ p.lowStockThreshold | number: '1.0-4' }} {{ p.baseUnit }}</span>
+                    <span class="muted"> · </span>
+                    <span>{{ lowStockInSellingUnit(p) | number: '1.2-4' }} {{ p.sellingUnit }}</span>
+                  }
+                </td>
+                <td>
+                  @if (p.hasExpiry && p.expiryDate) {
+                    {{ p.expiryDate }}
+                  } @else {
+                    <span class="muted">—</span>
+                  }
+                </td>
+                <td class="muted">{{ p.createdAt ? (p.createdAt | date: 'medium') : '—' }}</td>
+                <td class="actions" style="padding: 0.45rem 0.75rem; vertical-align: middle;">
+                  <div style="display: flex; gap: 0.4rem; justify-content: flex-end;">
+                    <p-button
+                      type="button"
+                      label="Adjust"
+                      [outlined]="true"
+                      size="small"
+                      icon="pi pi-sliders-h"
+                      (onClick)="openAdjustStock(p)"
+                    />
+                    <p-button
+                      type="button"
+                      label="Delete"
+                      severity="danger"
+                      [outlined]="true"
+                      size="small"
+                      icon="pi pi-trash"
+                      (onClick)="deleteProduct(p.id, p.name)"
+                    />
+                  </div>
+                </td>
+              </tr>
+
+              <!-- Adjust panel row -->
+              @if (adjustingId() === p.id) {
+                <tr class="adjust-row">
+                  <td colspan="9">
+                    <div class="adjust-panel" [formGroup]="adjustForm">
+                      <span class="adjust-title" style="margin-bottom: 0.75rem;">Set stock level</span>
+                      <div class="adjust-fields">
+                        <label class="field inline">
+                          <span class="label">Count as</span>
+                          <select
+                            class="input select"
+                            formControlName="stockInputMode"
+                            (change)="onAdjustModeChanged(p)"
+                          >
+                            @for (opt of stockModeOptionsForProduct(p); track opt.value) {
+                              <option [value]="opt.value">{{ opt.label }}</option>
+                            }
+                          </select>
+                        </label>
+                        <label class="field inline">
+                          <span class="label">Quantity</span>
+                          <input class="input" type="number" formControlName="stockQuantity" min="0" step="any" />
+                        </label>
+                        <span class="adjust-preview">
+                          →&nbsp;
+                          @if (p.type === 'count') {
+                            <strong>{{ previewAdjustStock(p) | number: '1.0-0' }} pc</strong>
+                            <span class="muted"> · </span>
+                            <strong>{{ previewAdjustStockCartons(p) | number: '1.0-2' }} {{ p.sellingUnit }}</strong>
+                          } @else {
+                            <strong>{{ previewAdjustStock(p) | number: '1.0-2' }} {{ p.baseUnit }}</strong>
+                            <span class="muted"> · </span>
+                            <strong>{{ previewAdjustStockSelling(p) | number: '1.2-4' }} {{ p.sellingUnit }}</strong>
+                          }
+                        </span>
+                        <div class="adjust-actions">
+                          <p-button
+                            type="button"
+                            [label]="savingAdjustId() === p.id ? 'Saving…' : 'Save'"
+                            [loading]="savingAdjustId() === p.id"
+                            [disabled]="savingAdjustId() === p.id"
+                            icon="pi pi-check"
+                            size="small"
+                            (onClick)="saveAdjustStock(p)"
+                          />
+                          <span style="margin-left: 0.4rem;">
+                            <p-button
+                              type="button"
+                              label="Cancel"
+                              [outlined]="true"
+                              size="small"
+                              (onClick)="cancelAdjustStock()"
+                            />
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </td>
+                </tr>
+              }
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </p-card>
+</div>

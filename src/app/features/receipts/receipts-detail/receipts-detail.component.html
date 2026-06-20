@@ -1,0 +1,109 @@
+<div class="page">
+  <p-card header="Receipt details" subheader="Read-only view" styleClass="list-card">
+    <div class="detail-actions">
+      <button type="button" class="btn-secondary" (click)="backToList()">Back to list</button>
+      <button type="button" class="btn-secondary" (click)="backToCreate()">Create receipt</button>
+    </div>
+
+    @if (error()) {
+      <p-message severity="error" [text]="error()!" [closable]="false" styleClass="msg-banner" />
+    }
+
+    @if (loading() && !receipt) {
+      <div class="state-empty">Loading receipt…</div>
+    } @else if (!receipt) {
+      <div class="state-empty">Receipt not found.</div>
+    } @else {
+      <div class="detail-top">
+        <div class="detail-meta">
+          <div class="meta-row">
+            <span class="meta-label">Invoice #</span>
+            <span class="meta-value mono">{{ receipt.invoiceNumber }}</span>
+          </div>
+          <div class="meta-row">
+            <span class="meta-label">Date/time</span>
+            <span class="meta-value muted">{{ receipt.createdAt ? (receipt.createdAt | date: 'medium') : '—' }}</span>
+          </div>
+          <div class="meta-row">
+            <span class="meta-label">Payment</span>
+            <span class="meta-value muted">{{ receipt.paymentMethod || '—' }}</span>
+          </div>
+        </div>
+
+        <div class="qr-box">
+          @if (qrDataUrl()) {
+            <img class="qr-img" [src]="qrDataUrl()!" alt="QR code" />
+          } @else {
+            <span class="muted">—</span>
+          }
+        </div>
+      </div>
+
+      <div class="section-title">Shop</div>
+      <div class="info-box">
+        <div style="font-weight: 800; margin-bottom: 0.25rem;">{{ receipt.shopName }}</div>
+        <div class="muted" style="white-space: pre-wrap;">{{ receipt.shopAddress }}</div>
+      </div>
+
+      <div class="section-title">Customer</div>
+      <div class="info-box">
+        @if (receipt.customer.mode === 'registered') {
+          <div style="font-weight: 800; margin-bottom: 0.25rem;">{{ receipt.customer.fullName }}</div>
+        } @else {
+          <div style="font-weight: 800; margin-bottom: 0.25rem;">{{ receipt.customer.fullName || 'Guest customer' }}</div>
+        }
+        <div class="muted" style="margin-top: 0.35rem; white-space: pre-wrap;">
+          {{ receipt.customer.address || '—' }}
+        </div>
+        <div class="muted" style="margin-top: 0.35rem;">
+          Phone: {{ receipt.customer.phone || '—' }} · CNIC: {{ receipt.customer.cnic || '—' }}
+        </div>
+      </div>
+
+      <div class="section-title">Totals</div>
+      <div class="totals-grid">
+        <div class="total-box">
+          <div class="total-label">Grand total</div>
+          <div class="total-value mono">{{ receipt.totals.grandTotal | number: '1.2-2' }}</div>
+        </div>
+        <div class="total-box">
+          <div class="total-label">Paid amount</div>
+          <div class="total-value mono">{{ receipt.totals.paidAmount | number: '1.2-2' }}</div>
+        </div>
+        <div class="total-box">
+          <div class="total-label">Remaining</div>
+          <div class="total-value mono">{{ receipt.totals.remainingAmount | number: '1.2-2' }}</div>
+        </div>
+      </div>
+
+      <div class="section-title">Products</div>
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th style="width: 110px;">Qty</th>
+              <th style="width: 140px;">Unit price</th>
+              <th style="width: 120px;">Discount %</th>
+              <th style="width: 120px;">Tax %</th>
+              <th style="width: 140px;">Line total</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (l of receipt.lines; let i = $index; track l.productId + '-' + i) {
+              <tr>
+                <td>{{ l.productName }}</td>
+                <td class="mono">{{ l.quantity | number: '1.0-4' }}</td>
+                <td class="mono">{{ l.unitPrice | number: '1.2-2' }}</td>
+                <td class="mono">{{ l.discountPercent | number: '1.0-2' }}</td>
+                <td class="mono">{{ l.taxPercent | number: '1.0-2' }}</td>
+                <td class="mono">{{ receiptLineTotal(l) | number: '1.2-2' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </p-card>
+</div>
+

@@ -1,0 +1,19 @@
+{
+  "rules": {
+    "products": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["createdAt"]
+    },
+    "customers": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["createdAt"]
+    },
+    "receipts": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["createdAt"]
+    }
+  }
+}

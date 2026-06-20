@@ -1,0 +1,73 @@
+/* Surface toolbar — no Material primary color; follows app theme variables */
+:host ::ng-deep .shop-toolbar.mat-toolbar {
+  background: var(--app-toolbar-bg) !important;
+  color: var(--app-toolbar-text) !important;
+  border-bottom: 1px solid var(--app-toolbar-border);
+  box-shadow: var(--app-toolbar-shadow);
+}
+
+.shop-toolbar {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  flex-shrink: 0;
+  min-height: 68px;
+  padding-inline: 1rem 0.35rem;
+}
+
+.toolbar-titles {
+  min-width: 0;
+}
+
+.toolbar-title {
+  margin: 0;
+  font-size: 1.2rem;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  color: var(--app-toolbar-text);
+}
+
+.toolbar-subtitle {
+  margin: 0.2rem 0 0;
+  font-size: 0.8125rem;
+  font-weight: 400;
+  line-height: 1.35;
+  color: var(--app-toolbar-muted);
+}
+
+.toolbar-spacer {
+  flex: 1 1 auto;
+}
+
+.user-email {
+  max-width: 14rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 0.78rem;
+  font-weight: 500;
+  padding: 0.35rem 0.65rem;
+  border-radius: 999px;
+  background: var(--app-user-chip-bg);
+  color: var(--app-user-chip-text);
+  margin-right: 0.15rem;
+}
+
+.theme-toggle {
+  margin-right: 0.15rem;
+}
+
+:host ::ng-deep .mat-mdc-icon-button.mat-mdc-button-base .mat-icon {
+  color: var(--app-toolbar-muted);
+}
+
+:host ::ng-deep .mat-mdc-icon-button.mat-mdc-button-base:hover .mat-icon {
+  color: var(--app-toolbar-text);
+}
+
+@media (max-width: 600px) {
+  .user-email {
+    max-width: 8rem;
+  }
+}

@@ -1,0 +1,23 @@
+<mat-toolbar class="shop-toolbar">
+  <div class="toolbar-titles">
+    <h1 class="toolbar-title">{{ pageTitle() }}</h1>
+    <p class="toolbar-subtitle">{{ pageSubtitle() }}</p>
+  </div>
+  <span class="toolbar-spacer"></span>
+  @if (user(); as u) {
+    <span class="user-email" [title]="u.email ?? 'Signed in'">{{ u.email ?? 'Account' }}</span>
+  }
+  <button
+    type="button"
+    mat-icon-button
+    class="theme-toggle"
+    (click)="theme.toggle()"
+    [attr.aria-label]="theme.isDark() ? 'Switch to light mode' : 'Switch to dark mode'"
+    [title]="theme.isDark() ? 'Light mode' : 'Dark mode'"
+  >
+    <mat-icon>{{ theme.isDark() ? 'light_mode' : 'dark_mode' }}</mat-icon>
+  </button>
+  <button type="button" mat-icon-button (click)="signOut()" aria-label="Sign out" title="Sign out">
+    <mat-icon>logout</mat-icon>
+  </button>
+</mat-toolbar>

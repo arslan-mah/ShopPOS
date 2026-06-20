@@ -1,0 +1,30 @@
+<div class="sidebar-inner">
+  <div class="brand">
+    <span class="brand-mark" aria-hidden="true"></span>
+    <span class="brand-name">My Shop</span>
+  </div>
+
+  <mat-nav-list class="nav-list">
+    <a
+      mat-list-item
+      routerLink="/home"
+      routerLinkActive="active-link"
+      [routerLinkActiveOptions]="{ exact: true }"
+    >
+      <mat-icon matListItemIcon>home</mat-icon>
+      <span matListItemTitle>Home</span>
+    </a>
+    <a mat-list-item routerLink="/products" routerLinkActive="active-link">
+      <mat-icon matListItemIcon>inventory_2</mat-icon>
+      <span matListItemTitle>Products</span>
+    </a>
+    <a mat-list-item routerLink="/customers" routerLinkActive="active-link">
+      <mat-icon matListItemIcon>people</mat-icon>
+      <span matListItemTitle>Customers</span>
+    </a>
+    <a mat-list-item routerLink="/receipts" routerLinkActive="active-link">
+      <mat-icon matListItemIcon>receipt_long</mat-icon>
+      <span matListItemTitle>Receipts</span>
+    </a>
+  </mat-nav-list>
+</div>

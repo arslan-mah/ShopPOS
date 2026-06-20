@@ -1,0 +1,45 @@
+:host {
+  display: block;
+  height: 100%;
+  min-height: 0;
+}
+
+/* Full viewport: only `.shop-main` scrolls; sidenav + toolbar stay fixed */
+.shop-shell {
+  height: 100vh;
+  height: 100dvh;
+  background: var(--app-shell-bg);
+}
+
+.shop-sidenav {
+  width: 260px;
+  border-right: 1px solid var(--app-sidebar-border);
+  background: var(--app-sidebar-bg);
+  color: #e2e8f0;
+}
+
+.shop-content-wrap {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+  background: var(--app-main-bg);
+}
+
+.shop-main {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 1.25rem 1.5rem 2rem;
+  -webkit-overflow-scrolling: touch;
+}
+
+@media (max-width: 768px) {
+  .shop-sidenav {
+    width: 220px;
+  }
+
+  .shop-main {
+    padding: 1rem 1rem 1.5rem;
+  }
+}

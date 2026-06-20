@@ -1,0 +1,19 @@
+<mat-sidenav-container class="shop-shell" [hasBackdrop]="false">
+  <mat-sidenav
+    class="shop-sidenav"
+    mode="side"
+    opened
+    [disableClose]="true"
+    [fixedInViewport]="true"
+    [fixedTopGap]="0"
+  >
+    <app-shop-sidebar />
+  </mat-sidenav>
+
+  <mat-sidenav-content class="shop-content-wrap">
+    <app-shop-header />
+    <main class="shop-main">
+      <router-outlet />
+    </main>
+  </mat-sidenav-content>
+</mat-sidenav-container>

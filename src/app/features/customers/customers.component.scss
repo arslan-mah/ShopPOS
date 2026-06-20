@@ -1,0 +1,349 @@
+/* ============================================================
+   Customers Component — matches Products design system
+   ============================================================ */
+
+   @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+
+   :host {
+     --c-bg: #f5f4f1;
+     --c-surface: #ffffff;
+     --c-surface-2: #faf9f7;
+     --c-border: #e8e5df;
+     --c-border-strong: #d4cfc5;
+   
+     --c-text: #1a1814;
+     --c-text-2: #6b6760;
+     --c-text-3: #a09c96;
+   
+     --c-accent: #2d6a4f;
+     --c-accent-soft: #e8f4ec;
+     --c-accent-hover: #245a42;
+   
+     --c-danger: #c0392b;
+     --c-danger-soft: #fdf0ef;
+   
+     --radius-sm: 6px;
+     --radius: 10px;
+     --radius-lg: 14px;
+   
+     --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+     --shadow: 0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
+     --shadow-lg: 0 12px 32px rgba(0,0,0,0.10), 0 4px 12px rgba(0,0,0,0.06);
+   
+     font-family: 'Outfit', sans-serif;
+     color: var(--c-text);
+   }
+   
+   /* ── Page ── */
+   .page {
+     padding: 2rem 2.5rem;
+     max-width: 1200px;
+     margin: 0 auto;
+     background: var(--c-bg);
+     min-height: 100vh;
+   }
+   
+   /* ── Add button ── */
+   .add-btn-row {
+     margin-bottom: 1.25rem;
+   }
+   
+   ::ng-deep .add-customer-btn.p-button {
+     background: var(--c-accent);
+     border-color: var(--c-accent);
+     border-radius: var(--radius);
+     font-family: 'Outfit', sans-serif;
+     font-weight: 600;
+     font-size: 0.875rem;
+     padding: 0.6rem 1.25rem;
+     letter-spacing: 0.01em;
+     transition: background 0.15s, transform 0.1s, box-shadow 0.15s;
+     box-shadow: 0 2px 8px rgba(45,106,79,0.25);
+   
+     &:hover {
+       background: var(--c-accent-hover) !important;
+       border-color: var(--c-accent-hover) !important;
+       transform: translateY(-1px);
+       box-shadow: 0 4px 12px rgba(45,106,79,0.30);
+     }
+   
+     &:active { transform: translateY(0); }
+   }
+   
+   /* ── Card ── */
+   ::ng-deep .list-card.p-card {
+     background: var(--c-surface);
+     border: 1px solid var(--c-border);
+     border-radius: var(--radius-lg);
+     box-shadow: var(--shadow);
+     overflow: hidden;
+   
+     .p-card-header { padding: 0; border-bottom: 1px solid var(--c-border); }
+     .p-card-body   { padding: 0; }
+     .p-card-content{ padding: 0; }
+   }
+   
+   .list-header-inner {
+     display: flex;
+     align-items: center;
+     justify-content: space-between;
+     padding: 1.25rem 1.75rem;
+   }
+   
+   .list-title {
+     font-size: 1.05rem;
+     font-weight: 600;
+     letter-spacing: -0.01em;
+   }
+   
+   /* ── Dialog ── */
+   ::ng-deep .p-dialog {
+     border-radius: var(--radius-lg) !important;
+     box-shadow: var(--shadow-lg) !important;
+     border: 1px solid var(--c-border) !important;
+     overflow: hidden;
+     font-family: 'Outfit', sans-serif;
+   
+     .p-dialog-header {
+       background: var(--c-surface);
+       border-bottom: 1px solid var(--c-border);
+       padding: 1.25rem 1.75rem;
+   
+       .p-dialog-title {
+         font-family: 'Outfit', sans-serif;
+         font-size: 1.1rem;
+         font-weight: 700;
+         letter-spacing: -0.01em;
+       }
+     }
+   
+     .p-dialog-content {
+       padding: 0 !important;
+       background: var(--c-surface);
+     }
+   }
+   
+   /* ── Form ── */
+   .form {
+     display: flex;
+     flex-direction: column;
+   }
+   
+   .form-body {
+     padding: 1.75rem;
+     display: flex;
+     flex-direction: column;
+     gap: 1.25rem;
+   }
+   
+   .form-row {
+     display: grid;
+     grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+     gap: 1rem;
+   }
+   
+   .field {
+     display: flex;
+     flex-direction: column;
+     gap: 0.35rem;
+   }
+   
+   .field-full { width: 100%; }
+   
+   .label {
+     font-size: 0.8rem;
+     font-weight: 600;
+     color: var(--c-text-2);
+     text-transform: uppercase;
+     letter-spacing: 0.05em;
+   }
+   
+   .req { color: var(--c-danger); margin-left: 1px; }
+   
+   .opt {
+     font-weight: 400;
+     color: var(--c-text-3);
+     font-size: 0.72rem;
+     text-transform: none;
+     letter-spacing: 0;
+   }
+   
+   .hint {
+     font-size: 0.75rem;
+     color: var(--c-text-3);
+   
+     &.err { color: var(--c-danger); }
+   }
+   
+   .input {
+     width: 100%;
+     padding: 0.6rem 0.85rem;
+     font-family: 'Outfit', sans-serif;
+     font-size: 0.9rem;
+     color: var(--c-text);
+     background: var(--c-surface);
+     border: 1.5px solid var(--c-border-strong);
+     border-radius: var(--radius-sm);
+     outline: none;
+     transition: border-color 0.15s, box-shadow 0.15s;
+     box-sizing: border-box;
+     -webkit-appearance: none;
+     appearance: none;
+   
+     &:focus {
+       border-color: var(--c-accent);
+       box-shadow: 0 0 0 3px rgba(45,106,79,0.12);
+     }
+   
+     &:hover:not(:focus) { border-color: #b8b3ab; }
+   }
+   
+   textarea.input {
+     resize: vertical;
+     min-height: 4rem;
+     font-family: 'Outfit', sans-serif;
+     line-height: 1.5;
+   }
+   
+   /* ── Form footer ── */
+   .form-actions {
+     display: flex;
+     align-items: center;
+     gap: 0.75rem;
+     padding: 1rem 1.75rem;
+     background: var(--c-surface-2);
+     border-top: 1px solid var(--c-border);
+   }
+   
+   /* ── PrimeNG overrides ── */
+   ::ng-deep {
+     .p-button {
+       font-family: 'Outfit', sans-serif !important;
+       font-weight: 600 !important;
+       border-radius: var(--radius-sm) !important;
+       transition: all 0.15s !important;
+     }
+   
+     .p-button-sm {
+       font-size: 0.8rem !important;
+       padding: 0.4rem 0.75rem !important;
+     }
+   
+     .p-button-danger.p-button-outlined {
+       color: var(--c-danger) !important;
+       border-color: var(--c-danger) !important;
+       &:hover { background: var(--c-danger-soft) !important; }
+     }
+   
+     .p-button-secondary.p-button-outlined {
+       color: var(--c-text-2) !important;
+       border-color: var(--c-border-strong) !important;
+       &:hover { background: var(--c-surface-2) !important; }
+     }
+   
+     .p-tag {
+       font-family: 'Outfit', sans-serif !important;
+       font-size: 0.72rem !important;
+       font-weight: 700 !important;
+       letter-spacing: 0.05em !important;
+       border-radius: 99px !important;
+       padding: 0.25rem 0.65rem !important;
+     }
+   
+     .p-message {
+       border-radius: var(--radius) !important;
+       margin: 0 1.75rem 1rem !important;
+     }
+   
+     .msg-banner { border-radius: var(--radius) !important; }
+   }
+   
+   /* ── Table ── */
+   .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+   
+   .table {
+     width: 100%;
+     border-collapse: collapse;
+     font-size: 0.875rem;
+   
+     thead tr {
+       background: var(--c-surface-2);
+       border-bottom: 2px solid var(--c-border);
+     }
+   
+     th {
+       padding: 0.75rem 1rem;
+       font-weight: 600;
+       font-size: 0.75rem;
+       text-transform: uppercase;
+       letter-spacing: 0.06em;
+       color: var(--c-text-2);
+       text-align: left;
+       white-space: nowrap;
+     }
+   
+     td {
+       padding: 0.85rem 1rem;
+       border-bottom: 1px solid var(--c-border);
+       vertical-align: middle;
+       color: var(--c-text);
+       line-height: 1.4;
+     }
+   
+     tbody tr {
+       transition: background 0.12s;
+   
+       &:hover { background: var(--c-surface-2); }
+       &:last-child td { border-bottom: none; }
+     }
+   
+     .name-cell { font-weight: 600; }
+   
+     .cell-address {
+       max-width: 14rem;
+       white-space: normal;
+       word-break: break-word;
+     }
+   
+     .mono {
+       font-family: 'JetBrains Mono', monospace;
+       font-size: 0.82rem;
+       color: var(--c-text-2);
+     }
+   
+     .actions {
+       text-align: right;
+       width: 1%;
+       white-space: nowrap;
+     }
+   }
+   
+   /* ── Muted ── */
+   .muted {
+     color: var(--c-text-2);
+     font-size: 0.82rem;
+   }
+   
+   code {
+     font-family: 'JetBrains Mono', monospace;
+     font-size: 0.8rem;
+     background: #f0ede8;
+     padding: 0.15em 0.4em;
+     border-radius: 4px;
+     color: var(--c-text-2);
+   }
+   
+   /* ── Empty states ── */
+   .state-empty {
+     padding: 3.5rem 1.75rem;
+     text-align: center;
+     color: var(--c-text-3);
+     font-size: 0.9rem;
+     line-height: 1.6;
+   }
+   
+   .state-empty-icon {
+     font-size: 2.5rem;
+     margin-bottom: 1rem;
+     opacity: 0.4;
+   }

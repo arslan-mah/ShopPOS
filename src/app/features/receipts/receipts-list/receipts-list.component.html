@@ -1,0 +1,61 @@
+<div class="page">
+  <p-card header="Receipts" subheader="View all invoices / receipts" styleClass="list-card">
+    <div class="list-actions">
+      <label class="filter">
+        <span class="filter-label">Search</span>
+        <input
+          class="input"
+          type="text"
+          [value]="filter()"
+          placeholder="Invoice # / customer / address…"
+          (input)="filter.set($any($event.target).value || '')"
+        />
+      </label>
+      <button type="button" class="btn-secondary" (click)="goCreate()">Create receipt</button>
+    </div>
+
+    @if (error()) {
+      <p-message severity="error" [text]="error()!" [closable]="false" styleClass="msg-banner" />
+    }
+
+    @if (loading() && filteredItems().length === 0) {
+      <div class="state-empty">Loading receipts…</div>
+    } @else if (filteredItems().length === 0) {
+      <div class="state-empty">
+        No receipts yet.<br />
+        Click <strong>Create receipt</strong> to start.
+      </div>
+    } @else {
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Invoice #</th>
+              <th>Customer</th>
+              <th>Grand total</th>
+              <th>Date/time</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (r of filteredItems(); track r.id) {
+              <tr class="row-click" (click)="openReceipt(r)">
+                <td class="mono">{{ r.invoiceNumber }}</td>
+                <td>
+                  <div class="cell-main">{{ displayCustomer(r.customer) }}</div>
+                  @if (r.customer.mode === 'registered') {
+                    <div class="cell-sub muted">{{ r.customer.address || '—' }}</div>
+                  } @else {
+                    <div class="cell-sub muted">{{ r.customer.address || '—' }}</div>
+                  }
+                </td>
+                <td class="mono">{{ r.totals.grandTotal | number: '1.2-2' }}</td>
+                <td class="muted">{{ r.createdAt ? (r.createdAt | date: 'medium') : '—' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </p-card>
+</div>
+
