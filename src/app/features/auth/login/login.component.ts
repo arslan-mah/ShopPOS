@@ -59,7 +59,7 @@ export class LoginComponent {
       } else {
         await this.auth.signIn(email, password);
       }
-      await this.router.navigateByUrl('/home');
+      await this.router.navigateByUrl('/dashboard');
     } catch (err: unknown) {
       this.errorMessage.set(this.mapAuthError(err));
     } finally {

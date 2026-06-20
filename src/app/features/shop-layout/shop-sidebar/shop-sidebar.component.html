@@ -7,6 +7,15 @@
   <mat-nav-list class="nav-list">
     <a
       mat-list-item
+      routerLink="/dashboard"
+      routerLinkActive="active-link"
+      [routerLinkActiveOptions]="{ exact: true }"
+    >
+      <mat-icon matListItemIcon>dashboard</mat-icon>
+      <span matListItemTitle>Dashboard</span>
+    </a>
+    <a
+      mat-list-item
       routerLink="/home"
       routerLinkActive="active-link"
       [routerLinkActiveOptions]="{ exact: true }"

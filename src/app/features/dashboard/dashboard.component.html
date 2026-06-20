@@ -1,0 +1,195 @@
+<div class="dashboard">
+  <header class="dash-header">
+    <div>
+      <h1 class="dash-title">Store Overview</h1>
+      <p class="dash-subtitle">Welcome back! Here's what's happening today.</p>
+    </div>
+    <div class="dash-header-actions">
+      <span class="date-pill">{{ todayLabel() }}</span>
+      <a routerLink="/products" class="add-product-btn">+ Add Product</a>
+    </div>
+  </header>
+
+  @if (error()) {
+    <div class="error-banner">{{ error() }}</div>
+  }
+
+  <section class="metrics-grid">
+    <article class="metric-card">
+      <div class="metric-top">
+        <span class="metric-icon">💰</span>
+        <span class="metric-trend up">+12% ↑</span>
+      </div>
+      <div class="metric-label">Today's Sales</div>
+      <div class="metric-value">{{ formatRs(todaySales()) }}</div>
+    </article>
+
+    <article class="metric-card">
+      <div class="metric-top">
+        <span class="metric-icon">📈</span>
+        <span class="metric-trend up">+5% ↑</span>
+      </div>
+      <div class="metric-label">Monthly Sales</div>
+      <div class="metric-value">{{ formatRs(monthlySales()) }}</div>
+    </article>
+
+    <article class="metric-card">
+      <div class="metric-top">
+        <span class="metric-icon">💵</span>
+        <span class="metric-trend up">+8% ↑</span>
+      </div>
+      <div class="metric-label">Profit (Est.)</div>
+      <div class="metric-value profit">{{ profitDisplay }}</div>
+    </article>
+
+    <article class="metric-card">
+      <div class="metric-top">
+        <span class="metric-icon">🧾</span>
+        <span class="metric-trend down">-2% ↓</span>
+      </div>
+      <div class="metric-label">Expenses</div>
+      <div class="metric-value">{{ expensesDisplay }}</div>
+    </article>
+
+    <article class="metric-card">
+      <div class="metric-top">
+        <span class="metric-icon">👥</span>
+      </div>
+      <div class="metric-label">Total Customers</div>
+      <div class="metric-value">{{ totalCustomers() }}</div>
+      <div class="metric-sub">{{ newCustomersThisMonth() }} new this month</div>
+    </article>
+
+    <article class="metric-card alert-card">
+      <div class="metric-top">
+        <span class="metric-icon warn">⚠</span>
+      </div>
+      <div class="metric-label">Low Stock</div>
+      <div class="metric-value danger">{{ lowStockCount() }}</div>
+      <div class="metric-sub danger-text">Action Required</div>
+    </article>
+  </section>
+
+  <section class="middle-grid">
+    <article class="panel chart-panel">
+      <div class="panel-head">
+        <h2 class="panel-title">Weekly Revenue Analytics</h2>
+        <span class="panel-select">Last 7 Days</span>
+      </div>
+      @if (loading()) {
+        <div class="panel-empty">Loading chart…</div>
+      } @else {
+        <div class="chart-wrap">
+          <svg class="revenue-chart" viewBox="0 0 560 200" preserveAspectRatio="none" aria-hidden="true">
+            <defs>
+              <linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#2d6a4f" stop-opacity="0.25" />
+                <stop offset="100%" stop-color="#2d6a4f" stop-opacity="0.02" />
+              </linearGradient>
+            </defs>
+            @for (y of [0, 1, 2, 3, 4]; track y) {
+              <line class="grid-line" x1="24" [attr.x2]="536" [attr.y1]="24 + y * 38" [attr.y2]="24 + y * 38" />
+            }
+            <path class="chart-area" [attr.d]="chartAreaPath()" fill="url(#chartFill)" />
+            <polyline class="chart-line" [attr.points]="chartPolyline()" />
+            @for (p of chartLinePoints(); track $index) {
+              <circle class="chart-dot" [attr.cx]="p.x" [attr.cy]="p.y" r="4" />
+            }
+          </svg>
+          <div class="chart-labels">
+            @for (d of weeklyRevenue(); track d.label + $index) {
+              <span>{{ d.label }}</span>
+            }
+          </div>
+        </div>
+      }
+    </article>
+
+    <article class="panel alerts-panel">
+      <div class="panel-head">
+        <h2 class="panel-title">Low Stock Alerts</h2>
+        <a routerLink="/products" class="panel-link">View All</a>
+      </div>
+      @if (lowStockAlerts().length === 0) {
+        <div class="panel-empty">All products are above low-stock threshold.</div>
+      } @else {
+        <ul class="alert-list">
+          @for (p of lowStockAlerts(); track p.id) {
+            <li class="alert-item">
+              <div class="alert-icon" aria-hidden="true">📦</div>
+              <div class="alert-body">
+                <div class="alert-name">{{ p.name }}</div>
+                <div class="alert-stock">{{ productStockLabel(p) }}</div>
+              </div>
+              <a routerLink="/products" class="restock-btn" title="Manage stock">🛒+</a>
+            </li>
+          }
+        </ul>
+      }
+    </article>
+  </section>
+
+  <section class="panel transactions-panel">
+    <div class="panel-head">
+      <h2 class="panel-title">Recent Transactions</h2>
+      <div class="panel-actions">
+        <a routerLink="/receipts" class="ghost-btn">Filters</a>
+        <a routerLink="/receipts" class="ghost-btn">Export</a>
+      </div>
+    </div>
+
+    @if (loading() && recentTransactions().length === 0) {
+      <div class="panel-empty">Loading transactions…</div>
+    } @else if (recentTransactions().length === 0) {
+      <div class="panel-empty">No transactions yet. Create sales from Point of Sale.</div>
+    } @else {
+      <div class="table-wrap">
+        <table class="txn-table">
+          <thead>
+            <tr>
+              <th>Order ID</th>
+              <th>Customer</th>
+              <th>Amount</th>
+              <th>Payment Method</th>
+              <th>Status</th>
+              <th>Date</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (r of recentTransactions(); track r.id) {
+              <tr>
+                <td class="mono">{{ orderId(r) }}</td>
+                <td>
+                  <span [class.credit-name]="r.totals.remainingAmount > 0">{{ customerWithCredit(r) }}</span>
+                </td>
+                <td class="mono" [class.amount-negative]="r.totals.grandTotal < 0" [class.amount-credit]="r.totals.remainingAmount > 0 && r.type !== 'refund'">
+                  {{ formatRs(r.totals.grandTotal) }}
+                </td>
+                <td>
+                  <span class="pay-method">
+                    <span class="pay-dot" [class]="paymentMethodClass(r.paymentMethod)"></span>
+                    {{ paymentMethodLabel(r.paymentMethod) }}
+                  </span>
+                </td>
+                <td>
+                  @if (transactionStatus(r) === 'Pending') {
+                    <span class="status-pill pending">Pending</span>
+                  } @else if (transactionStatus(r) === 'Refund') {
+                    <span class="status-pill refund">Refund</span>
+                  } @else {
+                    <span class="status-text">Paid</span>
+                  }
+                </td>
+                <td class="muted">{{ r.createdAt ? (r.createdAt | date: 'medium') : '—' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      <div class="table-footer">
+        <span class="muted">Showing {{ recentTransactions().length }} of {{ totalReceiptCount() }} transactions</span>
+        <a routerLink="/receipts" class="ghost-btn">View all receipts →</a>
+      </div>
+    }
+  </section>
+</div>

@@ -15,7 +15,12 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./features/shop-layout/shop-layout.component').then((m) => m.ShopLayoutComponent),
     children: [
-      { path: '', pathMatch: 'full', redirectTo: 'home' },
+      { path: '', pathMatch: 'full', redirectTo: 'dashboard' },
+      {
+        path: 'dashboard',
+        loadComponent: () =>
+          import('./features/dashboard/dashboard.component').then((m) => m.DashboardComponent),
+      },
       {
         path: 'home',
         loadComponent: () => import('./features/home/home.component').then((m) => m.HomeComponent),
@@ -38,5 +43,5 @@ export const routes: Routes = [
       { path: 'receipts/:id', redirectTo: 'receipts', pathMatch: 'full' },
     ],
   },
-  { path: '**', redirectTo: '/home' },
+  { path: '**', redirectTo: '/dashboard' },
 ];

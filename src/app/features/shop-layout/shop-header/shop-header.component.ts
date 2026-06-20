@@ -46,17 +46,21 @@ export class ShopHeaderComponent {
   );
 
   private titleFromUrl(url: string): string {
+    if (url.includes('/dashboard')) return 'Dashboard';
     if (url.includes('/products')) return 'Products';
     if (url.includes('/customers')) return 'Customers';
     if (url.includes('/receipts')) return 'Receipts';
-    return 'Point of Sale';
+    if (url.includes('/home')) return 'Point of Sale';
+    return 'My Shop';
   }
 
   private subtitleFromUrl(url: string): string {
+    if (url.includes('/dashboard')) return 'Store overview and analytics';
     if (url.includes('/products')) return 'Manage your product catalog';
     if (url.includes('/customers')) return 'Manage your customers';
     if (url.includes('/receipts')) return 'View and search saved invoices';
-    return 'Point of sale — sell products and checkout';
+    if (url.includes('/home')) return 'Point of sale — sell products and checkout';
+    return '';
   }
 
   async signOut(): Promise<void> {
