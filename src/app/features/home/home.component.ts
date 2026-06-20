@@ -359,6 +359,7 @@ export class HomeComponent {
       productName: l.productName,
       unitPrice: l.unitPrice,
       quantity: l.quantity,
+      unitLabel: l.unitLabel,
       discountPercent: l.discountPercent,
       taxPercent: l.taxPercent,
     }));
@@ -377,10 +378,11 @@ export class HomeComponent {
     this.error.set(null);
     try {
       await this.auth.ensureSessionForDatabase();
-      const id = await this.receiptsService.addReceipt(draft);
+      await this.receiptsService.addReceipt(draft);
+      await this.productsService.deductStockForReceiptLines(lines, this.products());
       this.cart.set([]);
       this.showCheckoutModal.set(false);
-      void this.router.navigateByUrl(`/receipts/${id}`);
+      void this.router.navigateByUrl('/receipts');
     } catch (err: unknown) {
       this.error.set(mapDataErrorMessage(err));
     } finally {

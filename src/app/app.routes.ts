@@ -1,9 +1,7 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/auth/auth.guard';
 import { loginPageGuard } from './core/auth/login-page.guard';
-import { ReceiptsComponent } from './features/receipts/receipts.component';
 import { ReceiptsListComponent } from './features/receipts/receipts-list/receipts-list.component';
-import { ReceiptsDetailComponent } from './features/receipts/receipts-detail/receipts-detail.component';
 
 export const routes: Routes = [
   {
@@ -34,16 +32,10 @@ export const routes: Routes = [
       },
       {
         path: 'receipts',
-        component: ReceiptsComponent,
-      },
-      {
-        path: 'receipts/list',
         component: ReceiptsListComponent,
       },
-      {
-        path: 'receipts/:id',
-        component: ReceiptsDetailComponent,
-      },
+      { path: 'receipts/list', redirectTo: 'receipts', pathMatch: 'full' },
+      { path: 'receipts/:id', redirectTo: 'receipts', pathMatch: 'full' },
     ],
   },
   { path: '**', redirectTo: '/home' },

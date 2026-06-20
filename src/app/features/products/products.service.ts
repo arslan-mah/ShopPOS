@@ -12,6 +12,7 @@ import {
 } from 'firebase/database';
 import { Observable } from 'rxjs';
 import { REALTIME_DATABASE } from '../../core/firebase/firebase.tokens';
+import type { ReceiptLineItem } from '../receipts/receipts.service';
 
 export type ProductUnitType = 'weight' | 'volume' | 'count';
 
@@ -40,6 +41,38 @@ export interface Product {
 }
 
 export type ProductDraft = Omit<Product, 'id' | 'createdAt'>;
+
+/** Convert sold quantity on a receipt line into stored base units. */
+export function soldQuantityToBaseUnits(
+  product: Product,
+  quantity: number,
+  unitLabel?: string,
+): number {
+  if (!Number.isFinite(quantity) || quantity <= 0) {
+    return 0;
+  }
+  const label = (unitLabel ?? '').trim().toLowerCase();
+
+  if (product.type === 'count') {
+    const ppc = Math.max(1, product.piecesPerCarton);
+    const selling = product.sellingUnit.trim().toLowerCase();
+    if (label === 'carton' || label === selling || label === 'cartons') {
+      return quantity * ppc;
+    }
+    return quantity;
+  }
+
+  if (product.type === 'weight' || product.type === 'volume') {
+    const cf = product.conversionFactor > 0 ? product.conversionFactor : 1;
+    const base = product.baseUnit.trim().toLowerCase();
+    if (label === base) {
+      return quantity;
+    }
+    return quantity * cf;
+  }
+
+  return quantity;
+}
 
 /** Convert user-entered quantity into stored base units (g, ml, or pieces). */
 export function stockQuantityToBase(params: {
@@ -137,6 +170,26 @@ export class ProductsService {
 
   async updateStock(id: string, stockInBaseUnit: number): Promise<void> {
     await update(ref(this.db, `products/${id}`), { stockInBaseUnit });
+  }
+
+  /** Reduce stock after a sale based on receipt line qty + unit label. */
+  async deductStockForReceiptLines(lines: ReceiptLineItem[], products: Product[]): Promise<void> {
+    const byId = new Map(products.map((p) => [p.id, p]));
+    const deductedByProduct = new Map<string, number>();
+
+    for (const line of lines) {
+      const p = byId.get(line.productId);
+      if (!p) continue;
+      const units = soldQuantityToBaseUnits(p, line.quantity, line.unitLabel);
+      deductedByProduct.set(p.id, (deductedByProduct.get(p.id) ?? 0) + units);
+    }
+
+    for (const [id, deduct] of deductedByProduct) {
+      const p = byId.get(id);
+      if (!p || deduct <= 0) continue;
+      const next = Math.max(0, p.stockInBaseUnit - deduct);
+      await this.updateStock(id, next);
+    }
   }
 
   async deleteProduct(id: string): Promise<void> {

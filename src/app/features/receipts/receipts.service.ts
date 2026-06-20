@@ -38,6 +38,8 @@ export interface ReceiptLineItem {
   productName: string;
   unitPrice: number; // in the receipt's chosen selling unit
   quantity: number;
+  /** e.g. pc, carton, kg — used to deduct stock correctly */
+  unitLabel?: string;
   discountPercent: number;
   taxPercent: number;
 }

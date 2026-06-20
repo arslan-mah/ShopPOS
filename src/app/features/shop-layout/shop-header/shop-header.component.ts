@@ -55,7 +55,7 @@ export class ShopHeaderComponent {
   private subtitleFromUrl(url: string): string {
     if (url.includes('/products')) return 'Manage your product catalog';
     if (url.includes('/customers')) return 'Manage your customers';
-    if (url.includes('/receipts')) return 'Create invoices and print-ready receipts';
+    if (url.includes('/receipts')) return 'View and search saved invoices';
     return 'Point of sale — sell products and checkout';
   }
 

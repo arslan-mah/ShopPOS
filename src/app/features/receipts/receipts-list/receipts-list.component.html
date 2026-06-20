@@ -1,5 +1,5 @@
 <div class="page">
-  <p-card header="Receipts" subheader="View all invoices / receipts" styleClass="list-card">
+  <p-card header="Receipts" subheader="All invoices — click a row to view details" styleClass="list-card">
     <div class="list-actions">
       <label class="filter">
         <span class="filter-label">Search</span>
@@ -11,7 +11,6 @@
           (input)="filter.set($any($event.target).value || '')"
         />
       </label>
-      <button type="button" class="btn-secondary" (click)="goCreate()">Create receipt</button>
     </div>
 
     @if (error()) {
@@ -23,7 +22,7 @@
     } @else if (filteredItems().length === 0) {
       <div class="state-empty">
         No receipts yet.<br />
-        Click <strong>Create receipt</strong> to start.
+        Create sales from <strong>Point of Sale</strong> on the Home page.
       </div>
     } @else {
       <div class="table-wrap">
@@ -42,11 +41,7 @@
                 <td class="mono">{{ r.invoiceNumber }}</td>
                 <td>
                   <div class="cell-main">{{ displayCustomer(r.customer) }}</div>
-                  @if (r.customer.mode === 'registered') {
-                    <div class="cell-sub muted">{{ r.customer.address || '—' }}</div>
-                  } @else {
-                    <div class="cell-sub muted">{{ r.customer.address || '—' }}</div>
-                  }
+                  <div class="cell-sub muted">{{ r.customer.address || '—' }}</div>
                 </td>
                 <td class="mono">{{ r.totals.grandTotal | number: '1.2-2' }}</td>
                 <td class="muted">{{ r.createdAt ? (r.createdAt | date: 'medium') : '—' }}</td>
@@ -59,3 +54,95 @@
   </p-card>
 </div>
 
+<p-dialog
+  header="Receipt details"
+  [visible]="showDetailModal()"
+  (visibleChange)="showDetailModal.set($event)"
+  [modal]="true"
+  [closable]="true"
+  [style]="{ width: '44rem', maxWidth: '96vw' }"
+  (onHide)="closeDetail()"
+>
+  @if (selectedReceipt(); as r) {
+    <div class="detail-top">
+      <div class="detail-meta">
+        <div class="meta-row">
+          <span class="meta-label">Invoice #</span>
+          <span class="meta-value mono">{{ r.invoiceNumber }}</span>
+        </div>
+        <div class="meta-row">
+          <span class="meta-label">Date/time</span>
+          <span class="meta-value muted">{{ r.createdAt ? (r.createdAt | date: 'medium') : '—' }}</span>
+        </div>
+        <div class="meta-row">
+          <span class="meta-label">Payment</span>
+          <span class="meta-value muted">{{ r.paymentMethod || '—' }}</span>
+        </div>
+      </div>
+      <div class="qr-box">
+        @if (qrDataUrl()) {
+          <img class="qr-img" [src]="qrDataUrl()!" alt="QR code" />
+        } @else {
+          <span class="muted">—</span>
+        }
+      </div>
+    </div>
+
+    <div class="info-grid">
+      <div class="info-box">
+        <div class="info-label">Shop</div>
+        <div class="info-title">{{ r.shopName }}</div>
+        <div class="muted">{{ r.shopAddress }}</div>
+      </div>
+      <div class="info-box">
+        <div class="info-label">Customer</div>
+        <div class="info-title">{{ displayCustomer(r.customer) }}</div>
+        <div class="muted">{{ r.customer.address || '—' }}</div>
+        <div class="muted small">Phone: {{ r.customer.phone || '—' }} · CNIC: {{ r.customer.cnic || '—' }}</div>
+      </div>
+    </div>
+
+    <div class="totals-grid">
+      <div class="total-box">
+        <span class="total-label">Grand total</span>
+        <strong class="mono">{{ r.totals.grandTotal | number: '1.2-2' }}</strong>
+      </div>
+      <div class="total-box">
+        <span class="total-label">Paid</span>
+        <strong class="mono">{{ r.totals.paidAmount | number: '1.2-2' }}</strong>
+      </div>
+      <div class="total-box">
+        <span class="total-label">Remaining</span>
+        <strong class="mono">{{ r.totals.remainingAmount | number: '1.2-2' }}</strong>
+      </div>
+    </div>
+
+    <div class="section-title">Products</div>
+    <div class="table-wrap">
+      <table class="table">
+        <thead>
+          <tr>
+            <th>Product</th>
+            <th>Qty</th>
+            <th>Unit price</th>
+            <th>Disc %</th>
+            <th>Tax %</th>
+            <th>Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (l of r.lines; let i = $index; track l.productId + '-' + i) {
+            <tr>
+              <td>{{ l.productName }}</td>
+              <td class="mono">{{ l.quantity | number: '1.0-4' }} {{ l.unitLabel || '' }}</td>
+              <td class="mono">{{ l.unitPrice | number: '1.2-2' }}</td>
+              <td class="mono">{{ l.discountPercent | number: '1.0-2' }}</td>
+              <td class="mono">{{ l.taxPercent | number: '1.0-2' }}</td>
+              <td class="mono">{{ receiptLineTotal(l) | number: '1.2-2' }}</td>
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</p-dialog>
