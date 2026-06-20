@@ -1,4 +1,6 @@
 .pos-page {
+  height: 100%;
+  min-height: calc(100dvh - 8rem);
   display: flex;
   flex-direction: column;
 }
@@ -7,7 +9,9 @@
   display: grid;
   grid-template-columns: 4fr 1fr;
   gap: 1rem;
-  align-items: start;
+  flex: 1;
+  min-height: 0;
+  align-items: stretch;
 }
 
 @media (max-width: 960px) {
@@ -20,18 +24,19 @@
 .pos-products {
   display: flex;
   flex-direction: column;
+  min-height: 0;
   background: var(--app-toolbar-bg);
   border: 1px solid var(--app-border);
   border-radius: 0.75rem;
   padding: 1rem;
+  overflow: hidden;
 }
 
 .pos-cart {
   display: flex;
   flex-direction: column;
-  position: sticky;
-  top: 0;
-  max-height: calc(100dvh - 7rem);
+  min-height: 0;
+  max-height: calc(100dvh - 8rem);
   background: var(--app-toolbar-bg);
   border: 1px solid var(--app-border);
   border-radius: 0.75rem;
@@ -66,11 +71,13 @@
 
 .product-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  grid-auto-rows: 7.25rem;
   gap: 0.75rem;
   align-content: start;
-  max-height: min(70vh, 640px);
   overflow-y: auto;
+  flex: 1;
+  min-height: 0;
   padding-right: 0.25rem;
 }
 
@@ -78,26 +85,20 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
+  justify-content: space-between;
   gap: 0.35rem;
+  height: 7.25rem;
   padding: 0.85rem;
-  min-height: 0;
-  height: auto;
-  align-self: start;
   text-align: left;
   border: 1px solid var(--app-border);
   border-radius: 0.65rem;
-  background: linear-gradient(180deg, var(--app-table-row-alt) 0%, var(--app-toolbar-bg) 100%);
+  background: var(--app-table-row-alt);
   cursor: pointer;
-  transition: border-color 0.15s, box-shadow 0.15s, transform 0.12s;
+  transition: border-color 0.15s, box-shadow 0.15s;
 
   &:hover {
     border-color: color-mix(in srgb, var(--p-primary-color, #0ea5e9) 50%, var(--app-border));
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
-    transform: translateY(-1px);
-  }
-
-  &:active {
-    transform: translateY(0);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
   }
 }
 
@@ -105,6 +106,11 @@
   font-weight: 700;
   font-size: 0.9rem;
   line-height: 1.3;
+  width: 100%;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
 }
 
 .product-price {

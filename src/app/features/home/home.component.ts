@@ -1,5 +1,5 @@
 import { DecimalPipe } from '@angular/common';
-import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, ElementRef, computed, inject, signal, viewChild } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -85,6 +85,7 @@ export class HomeComponent {
 
   readonly showProductModal = signal(false);
   readonly selectedProduct = signal<Product | null>(null);
+  private readonly quantityInputRef = viewChild<ElementRef<HTMLInputElement>>('quantityInput');
 
   readonly showCheckoutModal = signal(false);
   readonly customerMode = signal<ReceiptCustomerMode>('registered');
@@ -205,14 +206,29 @@ export class HomeComponent {
 
   openProductModal(p: Product): void {
     this.selectedProduct.set(p);
-    const step = this.defaultQuantityStep(p);
     this.productForm.reset({
-      quantity: step,
+      quantity: 1,
       unitPrice: this.defaultUnitPrice(p),
       discountPercent: 0,
       taxPercent: 0,
     });
     this.showProductModal.set(true);
+  }
+
+  onProductModalShow(): void {
+    setTimeout(() => this.focusAndSelectQuantity(), 50);
+  }
+
+  onQuantityFocus(event: FocusEvent): void {
+    const el = event.target as HTMLInputElement;
+    requestAnimationFrame(() => el.select());
+  }
+
+  private focusAndSelectQuantity(): void {
+    const el = this.quantityInputRef()?.nativeElement;
+    if (!el) return;
+    el.focus();
+    el.select();
   }
 
   closeProductModal(): void {

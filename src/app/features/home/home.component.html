@@ -91,6 +91,7 @@
   [modal]="true"
   [closable]="true"
   [style]="{ width: '28rem', maxWidth: '96vw' }"
+  (onShow)="onProductModalShow()"
   (onHide)="closeProductModal()"
 >
   @if (selectedProduct(); as p) {
@@ -100,7 +101,15 @@
     <form class="modal-form" [formGroup]="productForm" (ngSubmit)="confirmAddToCart()">
       <label class="field">
         <span class="label">Quantity ({{ unitLabel(p) }})</span>
-        <input class="input" type="number" formControlName="quantity" [step]="defaultQuantityStep(p)" min="0" />
+        <input
+          #quantityInput
+          class="input"
+          type="number"
+          formControlName="quantity"
+          [step]="defaultQuantityStep(p)"
+          min="0"
+          (focus)="onQuantityFocus($event)"
+        />
       </label>
       <label class="field">
         <span class="label">Unit price</span>
