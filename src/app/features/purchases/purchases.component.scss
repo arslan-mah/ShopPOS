@@ -1,0 +1,106 @@
+@import '../expenses/expenses.component.scss';
+
+.add-btn-row { margin-bottom: 1.25rem; }
+
+.lines-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 0.5rem;
+}
+
+.line-row {
+  display: grid;
+  grid-template-columns: 1fr 5rem 5rem 6rem auto auto;
+  gap: 0.5rem;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.line-total { font-size: 0.82rem; white-space: nowrap; }
+
+.total-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--c-border);
+  margin-top: 0.5rem;
+}
+
+.payment-section {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--c-border);
+}
+
+.payment-modes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.5rem 0 0.75rem;
+}
+
+.mode-btn {
+  padding: 0.4rem 0.75rem;
+  border: 1px solid var(--c-border);
+  border-radius: 6px;
+  background: var(--c-surface);
+  color: var(--c-text);
+  font-size: 0.82rem;
+  cursor: pointer;
+
+  &.active {
+    border-color: var(--p-primary-color, #3b82f6);
+    background: color-mix(in srgb, var(--p-primary-color, #3b82f6) 12%, transparent);
+    color: var(--p-primary-color, #3b82f6);
+    font-weight: 600;
+  }
+}
+
+.payment-fields { margin-top: 0.25rem; }
+
+.payment-summary {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.65rem 0.75rem;
+  border-radius: 8px;
+  background: var(--c-surface-2, #f8fafc);
+}
+
+.summary-line {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.88rem;
+
+  &.has-credit strong { color: var(--p-red-500, #ef4444); }
+}
+
+.credit-due { color: var(--p-red-500, #ef4444); font-weight: 600; }
+
+.credit-banner {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1rem;
+  border-radius: 8px;
+  border: 1px solid color-mix(in srgb, var(--c-warning, #e67e22) 40%, var(--c-border));
+  background: var(--c-warning-soft, #fef6ec);
+  font-size: 0.9rem;
+}
+
+.actions {
+  white-space: nowrap;
+  display: flex;
+  gap: 0.35rem;
+  justify-content: flex-end;
+}
+
+.sub { font-size: 0.78rem; color: var(--c-text-2); line-height: 1.4; }
+
+@media (max-width: 640px) {
+  .line-row { grid-template-columns: 1fr 1fr; }
+}

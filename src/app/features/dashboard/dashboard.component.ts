@@ -6,8 +6,12 @@ import { CardModule } from 'primeng/card';
 import { AuthService } from '../../core/auth/auth.service';
 import { mapDataErrorMessage } from '../../core/firebase/map-data-error-message';
 import { Customer, CustomersService } from '../customers/customers.service';
+import { Expense, ExpensesService } from '../expenses/expenses.service';
+import { Purchase, PurchasesService } from '../purchases/purchases.service';
+import { PurchasePayment, PurchasePaymentsService } from '../purchases/purchase-payments.service';
 import { Product, ProductsService } from '../products/products.service';
 import { Receipt, ReceiptCustomerRef, ReceiptsService } from '../receipts/receipts.service';
+import { computeReceiptProfitTotals } from '../receipts/receipt-math';
 
 type WeekDayPoint = {
   label: string;
@@ -31,23 +35,84 @@ export class DashboardComponent {
   private readonly receiptsService = inject(ReceiptsService);
   private readonly productsService = inject(ProductsService);
   private readonly customersService = inject(CustomersService);
+  private readonly expensesService = inject(ExpensesService);
+  private readonly purchasesService = inject(PurchasesService);
+  private readonly purchasePaymentsService = inject(PurchasePaymentsService);
 
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
   readonly receipts = signal<Receipt[]>([]);
   readonly products = signal<Product[]>([]);
   readonly customers = signal<Customer[]>([]);
+  readonly expenses = signal<Expense[]>([]);
+  readonly purchases = signal<Purchase[]>([]);
+  readonly purchasePayments = signal<PurchasePayment[]>([]);
 
-  /** Placeholder until expense tracking is implemented. */
-  readonly expensesDisplay = 'Rs. 42,500';
-  readonly profitDisplay = 'Rs. 180k';
-
-  readonly todaySales = computed(() => this.sumSalesForDay(new Date()));
-  readonly monthlySales = computed(() => this.sumSalesForMonth(new Date()));
+  readonly todaySales = computed(() => this.sumReceiptsForDay(new Date(), 'grandTotal'));
+  readonly monthlySales = computed(() => this.sumReceiptsForMonth(new Date(), 'grandTotal'));
+  readonly todayExpenses = computed(() => this.sumExpensesForDay(new Date()));
+  readonly monthlyExpenses = computed(() => this.sumExpensesForMonth(new Date()));
+  readonly monthlyGrossProfit = computed(() => this.sumProfitForMonth(new Date()));
+  readonly monthlyNetProfit = computed(() => this.monthlyGrossProfit() - this.monthlyExpenses());
+  readonly monthlyPurchasePaid = computed(() => this.sumSupplierPaymentsForMonth(new Date()));
+  readonly supplierCreditOutstanding = computed(() =>
+    this.purchases().reduce((sum, p) => sum + Math.max(0, p.remainingAmount), 0),
+  );
+  readonly revenueLast30Days = computed(() => this.sumReceiptsLastDays(30, 'grandTotal'));
   readonly totalCustomers = computed(() => this.customers().length);
   readonly newCustomersThisMonth = computed(() => {
     const now = new Date();
     return this.customers().filter((c) => c.createdAt && this.isSameMonth(c.createdAt, now)).length;
+  });
+
+  readonly topSellingProducts = computed(() => {
+    const qtyByProduct = new Map<string, { name: string; qty: number; revenue: number }>();
+    for (const r of this.receipts()) {
+      if (r.type === 'refund') continue;
+      for (const l of r.lines) {
+        const cur = qtyByProduct.get(l.productId) ?? { name: l.productName, qty: 0, revenue: 0 };
+        cur.qty += Math.abs(l.quantity);
+        cur.revenue += l.unitPrice * Math.abs(l.quantity);
+        qtyByProduct.set(l.productId, cur);
+      }
+    }
+    return [...qtyByProduct.entries()]
+      .map(([id, v]) => ({ id, ...v }))
+      .sort((a, b) => b.qty - a.qty)
+      .slice(0, 5);
+  });
+
+  readonly paymentBreakdown = computed(() => {
+    const map = new Map<string, number>();
+    for (const r of this.receipts()) {
+      if (!r.createdAt || !this.isSameMonth(r.createdAt, new Date())) continue;
+      const key = (r.paymentMethod || 'cash').toLowerCase();
+      map.set(key, (map.get(key) ?? 0) + r.totals.grandTotal);
+    }
+    return [...map.entries()].sort((a, b) => b[1] - a[1]);
+  });
+
+  readonly expenseBreakdown = computed(() => {
+    const map = new Map<string, number>();
+    for (const e of this.expenses()) {
+      if (!e.date || !this.isSameMonth(e.date, new Date())) continue;
+      const key = e.categoryId || 'uncategorized';
+      map.set(key, (map.get(key) ?? 0) + e.amount);
+    }
+    return [...map.entries()].sort((a, b) => b[1] - a[1]);
+  });
+
+  readonly expiryAlerts = computed(() => {
+    const now = new Date();
+    const in7 = new Date(now);
+    in7.setDate(in7.getDate() + 7);
+    const in30 = new Date(now);
+    in30.setDate(in30.getDate() + 30);
+    return this.products().filter((p) => {
+      if (!p.hasExpiry || !p.expiryDate) return false;
+      const exp = new Date(p.expiryDate);
+      return exp <= in30;
+    });
   });
 
   readonly lowStockCount = computed(
@@ -128,6 +193,30 @@ export class DashboardComponent {
         next: (rows) => this.customers.set(rows),
         error: () => {},
       });
+
+    this.expensesService
+      .watchExpenses()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (rows) => this.expenses.set(rows),
+        error: () => {},
+      });
+
+    this.purchasesService
+      .watchPurchases()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (rows) => this.purchases.set(rows),
+        error: () => {},
+      });
+
+    this.purchasePaymentsService
+      .watchPurchasePayments()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (rows) => this.purchasePayments.set(rows),
+        error: () => {},
+      });
   }
 
   formatRs(amount: number): string {
@@ -189,16 +278,61 @@ export class DashboardComponent {
     return inv.startsWith('#') ? inv : `#${inv}`;
   }
 
-  private sumSalesForDay(day: Date): number {
+  private sumReceiptsForDay(day: Date, field: 'grandTotal' | 'totalProfit'): number {
     return this.receipts()
       .filter((r) => r.createdAt && this.isSameDay(r.createdAt, day))
-      .reduce((sum, r) => sum + r.totals.grandTotal, 0);
+      .reduce((sum, r) => sum + (r.totals[field] ?? 0), 0);
   }
 
-  private sumSalesForMonth(day: Date): number {
+  private sumSupplierPaymentsForMonth(day: Date): number {
+    return this.purchasePayments()
+      .filter((p) => p.createdAt && this.isSameMonth(p.createdAt, day))
+      .reduce((sum, p) => sum + p.amount, 0);
+  }
+
+  private sumProfitForMonth(day: Date): number {
+    const products = this.products();
     return this.receipts()
       .filter((r) => r.createdAt && this.isSameMonth(r.createdAt, day))
-      .reduce((sum, r) => sum + r.totals.grandTotal, 0);
+      .reduce((sum, r) => sum + this.profitForReceipt(r, products), 0);
+  }
+
+  private profitForReceipt(r: Receipt, products: Product[]): number {
+    const stored = r.totals.totalProfit;
+    if (stored !== 0 || r.lines.length === 0) {
+      return stored;
+    }
+    return computeReceiptProfitTotals(r.lines, products).totalProfit;
+  }
+
+  private sumReceiptsForMonth(day: Date, field: 'grandTotal' | 'totalProfit'): number {
+    return this.receipts()
+      .filter((r) => r.createdAt && this.isSameMonth(r.createdAt, day))
+      .reduce((sum, r) => sum + (r.totals[field] ?? 0), 0);
+  }
+
+  private sumReceiptsLastDays(days: number, field: 'grandTotal' | 'totalProfit'): number {
+    const since = new Date();
+    since.setDate(since.getDate() - days);
+    return this.receipts()
+      .filter((r) => r.createdAt && r.createdAt >= since)
+      .reduce((sum, r) => sum + (r.totals[field] ?? 0), 0);
+  }
+
+  private sumExpensesForDay(day: Date): number {
+    return this.expenses()
+      .filter((e) => e.date && this.isSameDay(e.date, day))
+      .reduce((sum, e) => sum + e.amount, 0);
+  }
+
+  private sumExpensesForMonth(day: Date): number {
+    return this.expenses()
+      .filter((e) => e.date && this.isSameMonth(e.date, day))
+      .reduce((sum, e) => sum + e.amount, 0);
+  }
+
+  private sumSalesForDay(day: Date): number {
+    return this.sumReceiptsForDay(day, 'grandTotal');
   }
 
   private isSameDay(a: Date, b: Date): boolean {

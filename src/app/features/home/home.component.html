@@ -17,6 +17,12 @@
         />
       </div>
 
+      <app-barcode-scan-toolbar
+        [enabled]="posScanEnabled()"
+        hint="Scanner ready — scan product barcode to add to cart"
+        (codeScanned)="onPosBarcodeScanned($event)"
+      />
+
       @if (loading() && products().length === 0) {
         <div class="state-empty">Loading products…</div>
       } @else if (filteredProducts().length === 0) {
@@ -27,15 +33,16 @@
             <button
               type="button"
               class="product-card"
-              [class.out-of-stock]="isProductOutOfStock(p)"
-              [disabled]="isProductOutOfStock(p)"
+              [class.out-of-stock]="isProductUnavailable(p)"
+              [class.expired]="isProductExpired(p)"
+              [disabled]="isProductUnavailable(p)"
               (click)="openProductModal(p)"
             >
               <span class="stock-badge" [class]="stockBadgeClass(p)">{{ stockBadgeLabel(p) }}</span>
               <span class="product-name">{{ p.name }}</span>
               <div class="product-card-footer">
                 <span class="product-price">Rs. {{ productDisplayPrice(p) | number: '1.0-2' }}</span>
-                @if (!isProductOutOfStock(p)) {
+                @if (!isProductUnavailable(p)) {
                   <span class="add-icon" aria-hidden="true">+</span>
                 }
               </div>
@@ -163,7 +170,7 @@
       <strong>{{ cartGrandTotal() | number: '1.2-2' }}</strong>
     </div>
 
-    <div class="section-label">Customer (optional)</div>
+    <div class="section-label">Customer @if (checkoutRemainingAmount() > 0) { <span class="req">*</span> }</div>
     <label class="field">
       <span class="label">Search customer</span>
       <input
@@ -199,20 +206,86 @@
       <p class="search-hint muted">No customers found in your shop records.</p>
     }
 
-    <div class="field-row">
-      <label class="field">
-        <span class="label">Paid amount</span>
-        <input class="input" type="number" formControlName="paidAmount" min="0" step="0.01" />
-      </label>
-      <label class="field">
-        <span class="label">Payment</span>
-        <select class="input select" formControlName="paymentMethod">
-          <option value="cash">Cash</option>
-          <option value="card">Card</option>
-          <option value="bank">Bank transfer</option>
-          <option value="other">Other</option>
-        </select>
-      </label>
+    <div class="payment-section">
+      <div class="section-label">Payment</div>
+      <div class="payment-modes">
+        <button
+          type="button"
+          class="mode-btn"
+          [class.active]="checkoutPaymentMode() === 'net'"
+          (click)="setCheckoutPaymentMode('net')"
+        >
+          Net (pay in full)
+        </button>
+        <button
+          type="button"
+          class="mode-btn"
+          [class.active]="checkoutPaymentMode() === 'credit'"
+          (click)="setCheckoutPaymentMode('credit')"
+        >
+          Credit (on account)
+        </button>
+        <button
+          type="button"
+          class="mode-btn"
+          [class.active]="checkoutPaymentMode() === 'partial'"
+          (click)="setCheckoutPaymentMode('partial')"
+        >
+          Partial payment
+        </button>
+      </div>
+
+      @if (checkoutPaymentMode() === 'partial') {
+        <div class="field-row payment-fields">
+          <label class="field">
+            <span class="label">Paid now</span>
+            <input
+              class="input"
+              type="number"
+              min="0"
+              step="0.01"
+              [value]="checkoutPartialPaidAmount()"
+              (input)="onCheckoutPaidAmountInput($any($event.target).value)"
+            />
+          </label>
+          <label class="field">
+            <span class="label">Payment method</span>
+            <select class="input select" formControlName="paymentMethod">
+              <option value="cash">Cash</option>
+              <option value="card">Card</option>
+              <option value="bank">Bank transfer</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
+        </div>
+      } @else if (checkoutPaymentMode() === 'net' && checkoutPaidAmount() > 0) {
+        <div class="field-row payment-fields">
+          <label class="field">
+            <span class="label">Payment method</span>
+            <select class="input select" formControlName="paymentMethod">
+              <option value="cash">Cash</option>
+              <option value="card">Card</option>
+              <option value="bank">Bank transfer</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
+        </div>
+      }
+
+      <div class="payment-summary">
+        <div class="summary-line">
+          <span class="muted">Paid</span>
+          <span class="mono">{{ checkoutPaidAmount() | number: '1.2-2' }}</span>
+        </div>
+        <div class="summary-line" [class.has-credit]="checkoutRemainingAmount() > 0">
+          <span class="muted">Credit (customer owes)</span>
+          <strong class="mono">{{ checkoutRemainingAmount() | number: '1.2-2' }}</strong>
+        </div>
+      </div>
+
+      @if (checkoutRemainingAmount() > 0 && !selectedCustomer()) {
+        <p class="credit-hint">Select a customer above to record this credit sale.</p>
+      }
     </div>
 
     <div class="modal-actions">
@@ -225,5 +298,9 @@
       />
       <p-button type="button" label="Cancel" severity="secondary" [outlined]="true" [disabled]="saving()" (onClick)="closeCheckout()" />
     </div>
+
+    @if (error() && showCheckoutModal()) {
+      <p-message severity="error" [text]="error()!" [closable]="false" styleClass="msg-banner checkout-error" />
+    }
   </form>
 </p-dialog>

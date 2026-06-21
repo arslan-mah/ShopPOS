@@ -1,6 +1,7 @@
 :host {
   display: block;
   height: 100%;
+  color: var(--app-sidebar-text);
 }
 
 .sidebar-inner {
@@ -17,7 +18,7 @@
   align-items: center;
   gap: 0.65rem;
   padding: 0.5rem 0.75rem 1rem;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  border-bottom: 1px solid var(--app-sidebar-border);
   margin-bottom: 0.25rem;
 }
 
@@ -30,10 +31,10 @@
 }
 
 .brand-name {
-  font-weight: 600;
+  font-weight: 700;
   font-size: 1.05rem;
   letter-spacing: -0.02em;
-  color: #f8fafc;
+  color: var(--app-sidebar-text-active);
 }
 
 .nav-list {
@@ -44,19 +45,29 @@
   --mat-list-list-item-leading-icon-start-space: 12px;
   border-radius: 0.5rem;
   margin-bottom: 2px;
-  color: #94a3b8;
+  color: var(--app-sidebar-text-muted);
 
   &.active-link {
-    color: #f8fafc;
-    background: rgba(56, 189, 248, 0.18);
+    color: var(--app-sidebar-text-active);
+    background: var(--app-sidebar-active-bg);
   }
 
-  &:hover {
-    background: rgba(255, 255, 255, 0.06);
+  &:hover:not(.active-link) {
+    background: var(--app-sidebar-hover-bg);
+    color: var(--app-sidebar-text);
   }
 }
 
 .nav-list mat-icon {
   color: inherit;
-  opacity: 0.95;
+}
+
+/* Override Material theme text (dark in light mode) on our dark sidebar */
+:host ::ng-deep .nav-list a.mat-mdc-list-item {
+  .mdc-list-item__primary-text,
+  .mat-mdc-list-item-title,
+  .mdc-list-item__content,
+  mat-icon {
+    color: inherit !important;
+  }
 }

@@ -3,7 +3,7 @@
     "products": {
       ".read": "auth != null",
       ".write": "auth != null",
-      ".indexOn": ["createdAt"]
+      ".indexOn": ["createdAt", "barcode"]
     },
     "customers": {
       ".read": "auth != null",
@@ -11,6 +11,50 @@
       ".indexOn": ["createdAt"]
     },
     "receipts": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["createdAt"]
+    },
+    "expenses": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["createdAt", "date"]
+    },
+    "expenseCategories": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["createdAt"]
+    },
+    "suppliers": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["createdAt"]
+    },
+    "purchases": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["createdAt"]
+    },
+    "stockMovements": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["createdAt", "productId"]
+    },
+    "creditPayments": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["createdAt", "receiptId", "customerId"]
+    },
+    "purchasePayments": {
+      ".read": "auth != null",
+      ".write": "auth != null",
+      ".indexOn": ["createdAt", "purchaseId", "supplierId"]
+    },
+    "settings": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "users": {
       ".read": "auth != null",
       ".write": "auth != null",
       ".indexOn": ["createdAt"]

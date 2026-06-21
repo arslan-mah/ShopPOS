@@ -8,6 +8,8 @@ import { MessageModule } from 'primeng/message';
 import { InputTextModule } from 'primeng/inputtext';
 import { TagModule } from 'primeng/tag';
 import QRCode from 'qrcode';
+import { BarcodeScanToolbarComponent } from '../../../shared/barcode/barcode-scan-toolbar.component';
+import { findReceiptByScanCode } from '../../../shared/barcode/barcode.util';
 import { AuthService } from '../../../core/auth/auth.service';
 import { mapDataErrorMessage } from '../../../core/firebase/map-data-error-message';
 import { Product, ProductsService } from '../../products/products.service';
@@ -21,6 +23,7 @@ import {
   hasRefundableQuantity,
   receiptLineTotal,
 } from '../receipts.service';
+import { computeReceiptProfitTotals } from '../receipt-math';
 
 @Component({
   selector: 'app-receipts-list',
@@ -34,6 +37,7 @@ import {
     TagModule,
     DatePipe,
     DecimalPipe,
+    BarcodeScanToolbarComponent,
   ],
   templateUrl: './receipts-list.component.html',
   styleUrl: './receipts-list.component.scss',
@@ -63,6 +67,10 @@ export class ReceiptsListComponent {
     if (!r || r.type === 'refund') return false;
     return hasRefundableQuantity(r, this.items());
   });
+
+  readonly receiptScanEnabled = computed(
+    () => !this.showDetailModal() && !this.showRefundModal() && !this.refunding(),
+  );
 
   constructor() {
     void this.subscribeWhenAuthReady();
@@ -147,9 +155,23 @@ export class ReceiptsListComponent {
     this.showDetailModal.set(true);
   }
 
+  onReceiptBarcodeScanned(code: string): void {
+    const receipt = findReceiptByScanCode(this.items(), code);
+    if (!receipt) {
+      this.error.set(`No receipt found for "${code}".`);
+      return;
+    }
+    this.error.set(null);
+    this.openReceipt(receipt);
+  }
+
   closeDetail(): void {
     this.showDetailModal.set(false);
     this.selectedReceipt.set(null);
+  }
+
+  printDetail(): void {
+    window.print();
   }
 
   openOriginalReceipt(originalId: string | undefined): void {
@@ -273,7 +295,6 @@ export class ReceiptsListComponent {
     try {
       await this.auth.ensureSessionForDatabase();
       const lines = this.refundLines();
-      const refundId = await this.receiptsService.addRefundReceipt(original, lines);
       const refundLinesPayload = lines
         .filter((l) => l.selected && l.refundQty > 0)
         .map((l) => ({
@@ -281,8 +302,10 @@ export class ReceiptsListComponent {
           quantity: -l.refundQty,
           originalLineIndex: l.lineIndex,
         }));
+      const profitTotals = computeReceiptProfitTotals(refundLinesPayload, this.products());
+      const refundId = await this.receiptsService.addRefundReceipt(original, lines, profitTotals);
 
-      await this.productsService.restoreStockForReceiptLines(refundLinesPayload, this.products());
+      await this.productsService.restoreStockForReceiptLines(refundLinesPayload, this.products(), refundId);
 
       this.closeRefundModal();
 

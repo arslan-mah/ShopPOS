@@ -47,19 +47,33 @@ export class ShopHeaderComponent {
 
   private titleFromUrl(url: string): string {
     if (url.includes('/dashboard')) return 'Dashboard';
-    if (url.includes('/products')) return 'Products';
-    if (url.includes('/customers')) return 'Customers';
-    if (url.includes('/receipts')) return 'Receipts';
     if (url.includes('/home')) return 'Point of Sale';
+    if (url.includes('/products')) return 'Products';
+    if (url.includes('/purchases')) return 'Purchases';
+    if (url.includes('/customers/')) return 'Customer profile';
+    if (url.includes('/customers')) return 'Customers';
+    if (url.includes('/credit')) return 'Credit Ledger';
+    if (url.includes('/receipts')) return 'Receipts';
+    if (url.includes('/expenses')) return 'Expenses';
+    if (url.includes('/suppliers')) return 'Suppliers';
+    if (url.includes('/stock-history')) return 'Stock History';
+    if (url.includes('/settings')) return 'Settings';
     return 'My Shop';
   }
 
   private subtitleFromUrl(url: string): string {
     if (url.includes('/dashboard')) return 'Store overview and analytics';
-    if (url.includes('/products')) return 'Manage your product catalog';
-    if (url.includes('/customers')) return 'Manage your customers';
-    if (url.includes('/receipts')) return 'View and search saved invoices';
     if (url.includes('/home')) return 'Point of sale — sell products and checkout';
+    if (url.includes('/products')) return 'Manage your product catalog';
+    if (url.includes('/purchases')) return 'Record supplier purchases and stock-in';
+    if (url.includes('/customers/')) return 'Receipt history, credit balance, and payments';
+    if (url.includes('/customers')) return 'Manage your customers';
+    if (url.includes('/credit')) return 'Outstanding balances and payments';
+    if (url.includes('/receipts')) return 'View and search saved invoices';
+    if (url.includes('/expenses')) return 'Track shop expenses';
+    if (url.includes('/suppliers')) return 'Manage suppliers';
+    if (url.includes('/stock-history')) return 'Inventory movement history';
+    if (url.includes('/settings')) return 'Shop profile and defaults';
     return '';
   }
 

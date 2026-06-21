@@ -1,7 +1,8 @@
-import { DatePipe } from '@angular/common';
+import { CurrencyPipe, DatePipe } from '@angular/common';
 import { Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { Router, RouterLink } from '@angular/router';
 import { ButtonModule } from 'primeng/button';
 import { CardModule } from 'primeng/card';
 import { DialogModule } from 'primeng/dialog';
@@ -11,13 +12,18 @@ import { TagModule } from 'primeng/tag';
 import { TextareaModule } from 'primeng/textarea';
 import { AuthService } from '../../core/auth/auth.service';
 import { mapDataErrorMessage } from '../../core/firebase/map-data-error-message';
+import { downloadCsv } from '../../core/utils/csv-export';
+import { ReceiptsService } from '../receipts/receipts.service';
+import { outstandingCreditByCustomerId } from './customer-credit.util';
 import { Customer, CustomersService } from './customers.service';
 
 @Component({
   selector: 'app-customers',
   imports: [
+    RouterLink,
     ReactiveFormsModule,
     DatePipe,
+    CurrencyPipe,
     CardModule,
     InputTextModule,
     TextareaModule,
@@ -34,14 +40,18 @@ export class CustomersComponent implements OnInit {
   private readonly auth = inject(AuthService);
   private readonly fb = inject(FormBuilder);
   private readonly customersService = inject(CustomersService);
+  private readonly receiptsService = inject(ReceiptsService);
+  private readonly router = inject(Router);
 
   readonly items = signal<Customer[]>([]);
+  readonly creditByCustomerId = signal<Map<string, number>>(new Map());
   readonly loading = signal(true);
   readonly saving = signal(false);
   readonly error = signal<string | null>(null);
 
   /** Controls the Add Customer dialog visibility */
   showAddCustomerModal = false;
+  editingCustomerId: string | null = null;
 
   readonly form = this.fb.nonNullable.group({
     fullName: ['', [Validators.required, Validators.maxLength(200)]],
@@ -75,9 +85,42 @@ export class CustomersComponent implements OnInit {
           this.loading.set(false);
         },
       });
+
+    this.receiptsService
+      .watchReceipts()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (rows) => this.creditByCustomerId.set(outstandingCreditByCustomerId(rows)),
+        error: () => {},
+      });
   }
 
-  async addCustomer(): Promise<void> {
+  customerCredit(id: string): number {
+    return this.creditByCustomerId().get(id) ?? 0;
+  }
+
+  openCustomer(c: Customer): void {
+    void this.router.navigate(['/customers', c.id]);
+  }
+
+  onModalClosed(): void {
+    this.showAddCustomerModal = false;
+    this.editingCustomerId = null;
+    this.form.reset({ fullName: '', address: '', phone: '', cnic: '' });
+  }
+
+  openEditCustomer(c: Customer): void {
+    this.editingCustomerId = c.id;
+    this.form.patchValue({
+      fullName: c.fullName,
+      address: c.address,
+      phone: c.phone,
+      cnic: c.cnic,
+    });
+    this.showAddCustomerModal = true;
+  }
+
+  async saveCustomer(): Promise<void> {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
       return;
@@ -87,9 +130,13 @@ export class CustomersComponent implements OnInit {
     this.error.set(null);
     try {
       await this.auth.ensureSessionForDatabase();
-      await this.customersService.addCustomer(fullName, address, phone, cnic);
+      if (this.editingCustomerId) {
+        await this.customersService.updateCustomer(this.editingCustomerId, fullName, address, phone, cnic);
+      } else {
+        await this.customersService.addCustomer(fullName, address, phone, cnic);
+      }
       this.showAddCustomerModal = false;
-      this.form.reset({ fullName: '', address: '', phone: '', cnic: '' });
+      this.onModalClosed();
     } catch (err: unknown) {
       this.error.set(mapDataErrorMessage(err));
     } finally {
@@ -97,8 +144,8 @@ export class CustomersComponent implements OnInit {
     }
   }
 
-  onModalClosed(): void {
-    this.showAddCustomerModal = false;
+  async addCustomer(): Promise<void> {
+    await this.saveCustomer();
   }
 
   async deleteCustomer(id: string, fullName: string): Promise<void> {
@@ -112,5 +159,16 @@ export class CustomersComponent implements OnInit {
     } catch (err: unknown) {
       this.error.set(mapDataErrorMessage(err));
     }
+  }
+
+  exportCustomersCsv(): void {
+    const rows = this.items().map((c) => [
+      c.fullName,
+      c.address,
+      c.phone,
+      c.cnic,
+      c.createdAt?.toISOString() ?? '',
+    ]);
+    downloadCsv('customers.csv', ['Full Name', 'Address', 'Phone', 'CNIC', 'Created'], rows);
   }
 }

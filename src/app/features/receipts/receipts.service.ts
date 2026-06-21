@@ -52,6 +52,8 @@ export interface ReceiptTotals {
   grandTotal: number;
   paidAmount: number;
   remainingAmount: number;
+  totalCost: number;
+  totalProfit: number;
 }
 
 export interface Receipt {
@@ -190,6 +192,8 @@ export class ReceiptsService {
         grandTotal: draft.totals.grandTotal,
         paidAmount: draft.totals.paidAmount,
         remainingAmount: draft.totals.remainingAmount,
+        totalCost: draft.totals.totalCost ?? 0,
+        totalProfit: draft.totals.totalProfit ?? 0,
       },
       paymentMethod: draft.paymentMethod.trim(),
     };
@@ -206,6 +210,7 @@ export class ReceiptsService {
   async addRefundReceipt(
     original: Receipt,
     refundableLines: RefundableLineState[],
+    profit?: { totalCost: number; totalProfit: number },
   ): Promise<string> {
     const selected = refundableLines.filter((l) => l.selected && l.refundQty > 0);
     if (selected.length === 0) {
@@ -230,6 +235,7 @@ export class ReceiptsService {
     }));
 
     const grandTotal = receiptGrandTotal(lines);
+    const profitTotals = profit ?? { totalCost: 0, totalProfit: 0 };
     const draft: ReceiptDraft = {
       type: 'refund',
       shopName: original.shopName,
@@ -241,6 +247,8 @@ export class ReceiptsService {
         grandTotal,
         paidAmount: grandTotal,
         remainingAmount: 0,
+        totalCost: profitTotals.totalCost,
+        totalProfit: profitTotals.totalProfit,
       },
       paymentMethod: original.paymentMethod,
       originalReceiptId: original.id,
@@ -307,6 +315,8 @@ function mapTotals(v: unknown): ReceiptTotals {
     grandTotal: num(raw['grandTotal'], 0),
     paidAmount: num(raw['paidAmount'], 0),
     remainingAmount: num(raw['remainingAmount'], 0),
+    totalCost: num(raw['totalCost'], 0),
+    totalProfit: num(raw['totalProfit'], 0),
   };
 }
 

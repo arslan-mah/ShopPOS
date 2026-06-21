@@ -1,5 +1,5 @@
 import { DatePipe, DecimalPipe } from '@angular/common';
-import { Component, DestroyRef, inject, OnInit, signal } from '@angular/core';
+import { Component, DestroyRef, HostListener, computed, inject, OnInit, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { ButtonModule } from 'primeng/button';
@@ -18,6 +18,15 @@ import {
   StockInputMode,
   stockQuantityToBase,
 } from './products.service';
+import { StockMovementsService } from '../stock/stock-movements.service';
+import {
+  isProductExpired,
+  isProductExpiringSoon,
+  productExpiryTagLabel,
+  productExpiryTagSeverity,
+} from './product-expiry.util';
+import { BarcodeScanToolbarComponent } from '../../shared/barcode/barcode-scan-toolbar.component';
+import { findProductByBarcode } from '../../shared/barcode/barcode.util';
 
 /** Count products: price entered per piece or per carton. */
 export type CountPriceMode = 'piece' | 'carton';
@@ -36,6 +45,7 @@ export type AdjustStockMode = StockInputMode | 'carton';
     DialogModule,
     MessageModule,
     TagModule,
+    BarcodeScanToolbarComponent,
   ],
   templateUrl: './products.component.html',
   styleUrl: './products.component.scss',
@@ -45,6 +55,7 @@ export class ProductsComponent implements OnInit {
   private readonly auth = inject(AuthService);
   private readonly fb = inject(FormBuilder);
   private readonly productsService = inject(ProductsService);
+  private readonly stockMovements = inject(StockMovementsService);
   /** Tracks previous low-stock unit for converting quantity when the unit changes. */
   private lastLowStockMode: AdjustStockMode = 'base';
 
@@ -55,8 +66,14 @@ export class ProductsComponent implements OnInit {
   readonly error = signal<string | null>(null);
   readonly adjustingId = signal<string | null>(null);
 
-  /** Controls the Add Product dialog visibility */
-  showAddProductModal = false;
+  /** Single modal for add + edit */
+  showProductModal = false;
+  readonly editingProduct = signal<Product | null>(null);
+  readonly openMenuId = signal<string | null>(null);
+
+  readonly isEditMode = computed(() => this.editingProduct() !== null);
+
+  readonly productScanEnabled = computed(() => !this.showProductModal && !this.saving());
 
   readonly unitTypes: { value: ProductUnitType; label: string }[] = [
     { value: 'weight', label: 'Weight (g / kg)' },
@@ -66,6 +83,7 @@ export class ProductsComponent implements OnInit {
 
   readonly form = this.fb.nonNullable.group({
     name: ['', [Validators.required, Validators.maxLength(200)]],
+    barcode: ['', [Validators.maxLength(100)]],
     type: this.fb.nonNullable.control<ProductUnitType>('weight', [Validators.required]),
     baseUnit: ['g', [Validators.required, Validators.maxLength(20)]],
     sellingUnit: ['kg', [Validators.required, Validators.maxLength(20)]],
@@ -444,7 +462,17 @@ export class ProductsComponent implements OnInit {
     this.error.set(null);
     try {
       await this.auth.ensureSessionForDatabase();
+      const prev = p.stockInBaseUnit;
       await this.productsService.updateStock(p.id, stockInBaseUnit);
+      const delta = Math.abs(stockInBaseUnit - prev);
+      if (delta > 0) {
+        await this.stockMovements.logMovement({
+          productId: p.id,
+          productName: p.name,
+          type: 'adjustment',
+          quantityInBaseUnit: delta,
+        });
+      }
       this.adjustingId.set(null);
     } catch (err: unknown) {
       this.error.set(mapDataErrorMessage(err));
@@ -476,10 +504,34 @@ export class ProductsComponent implements OnInit {
       });
   }
 
-  async addProduct(): Promise<void> {
-    if (this.form.invalid) {
+  async saveProduct(): Promise<void> {
+    const editing = this.editingProduct();
+    const draft = this.buildDraftFromForm(editing?.stockInBaseUnit);
+    if (!draft) {
       this.form.markAllAsTouched();
       return;
+    }
+
+    this.saving.set(true);
+    this.error.set(null);
+    try {
+      await this.auth.ensureSessionForDatabase();
+      if (editing) {
+        await this.productsService.updateProduct(editing.id, draft);
+      } else {
+        await this.productsService.addProduct(draft);
+      }
+      this.closeProductModal();
+    } catch (err: unknown) {
+      this.error.set(mapDataErrorMessage(err));
+    } finally {
+      this.saving.set(false);
+    }
+  }
+
+  private buildDraftFromForm(existingStockInBase?: number): ProductDraft | null {
+    if (this.form.invalid) {
+      return null;
     }
     const v = this.form.getRawValue();
     const ppc = v.type === 'count' ? Math.max(1, v.piecesPerCarton) : 1;
@@ -492,7 +544,8 @@ export class ProductsComponent implements OnInit {
     let conversionFactor: number;
 
     if (v.type === 'count') {
-      stockInBaseUnit = v.cartonsInStock * ppc;
+      stockInBaseUnit =
+        existingStockInBase !== undefined ? existingStockInBase : v.cartonsInStock * ppc;
       pricePerPiece =
         v.countPriceMode === 'piece' ? v.countPriceAmount : v.countPriceAmount / ppc;
       pricePerUnit = 0;
@@ -500,13 +553,16 @@ export class ProductsComponent implements OnInit {
       sellingUnit = 'carton';
       conversionFactor = ppc;
     } else {
-      stockInBaseUnit = stockQuantityToBase({
-        type: v.type,
-        conversionFactor: v.conversionFactor,
-        piecesPerCarton: 1,
-        mode: v.stockInputMode,
-        quantity: v.stockQuantity,
-      });
+      stockInBaseUnit =
+        existingStockInBase !== undefined
+          ? existingStockInBase
+          : stockQuantityToBase({
+              type: v.type,
+              conversionFactor: v.conversionFactor,
+              piecesPerCarton: 1,
+              mode: v.stockInputMode,
+              quantity: v.stockQuantity,
+            });
       pricePerUnit = v.pricePerUnit;
       pricePerPiece = 0;
       baseUnit = v.baseUnit;
@@ -522,7 +578,7 @@ export class ProductsComponent implements OnInit {
       quantity: v.lowStockQuantity,
     });
 
-    const draft: ProductDraft = {
+    return {
       name: v.name,
       type: v.type,
       baseUnit,
@@ -536,46 +592,164 @@ export class ProductsComponent implements OnInit {
       piecesPerCarton: v.type === 'count' ? ppc : 1,
       hasExpiry: v.hasExpiry,
       expiryDate: v.hasExpiry && v.expiryDate ? v.expiryDate : null,
+      barcode: v.barcode.trim() || undefined,
     };
-
-    this.saving.set(true);
-    this.error.set(null);
-    try {
-      await this.auth.ensureSessionForDatabase();
-      await this.productsService.addProduct(draft);
-      this.showAddProductModal = false;
-      this.form.reset({
-        name: '',
-        type: 'weight',
-        baseUnit: 'g',
-        sellingUnit: 'kg',
-        conversionFactor: 1000,
-        pricePerUnit: 0,
-        cost: 0,
-        piecesPerCarton: 10,
-        cartonsInStock: 0,
-        countPriceMode: 'piece',
-        countPriceAmount: 0,
-        stockInputMode: 'base',
-        stockQuantity: 0,
-        lowStockInputMode: 'base',
-        lowStockQuantity: 0,
-        hasExpiry: false,
-        expiryDate: '',
-      });
-      this.lastLowStockMode = this.form.controls.lowStockInputMode.value;
-    } catch (err: unknown) {
-      this.error.set(mapDataErrorMessage(err));
-    } finally {
-      this.saving.set(false);
-    }
   }
 
-  onModalClosed(): void {
-    this.showAddProductModal = false;
+  openAddProduct(): void {
+    this.editingProduct.set(null);
+    this.form.reset({
+      name: '',
+      barcode: '',
+      type: 'weight',
+      baseUnit: 'g',
+      sellingUnit: 'kg',
+      conversionFactor: 1000,
+      pricePerUnit: 0,
+      cost: 0,
+      piecesPerCarton: 10,
+      cartonsInStock: 0,
+      countPriceMode: 'piece',
+      countPriceAmount: 0,
+      stockInputMode: 'base',
+      stockQuantity: 0,
+      lowStockInputMode: 'base',
+      lowStockQuantity: 0,
+      hasExpiry: false,
+      expiryDate: '',
+    });
+    this.lastLowStockMode = this.form.controls.lowStockInputMode.value;
+    this.showProductModal = true;
+  }
+
+  openEditProduct(p: Product): void {
+    this.closeRowMenu();
+    this.editingProduct.set(p);
+    const ppc = Math.max(1, p.piecesPerCarton);
+    const lowMode = this.lowStockModeForProduct(p);
+
+    if (p.type === 'count') {
+      this.form.patchValue({
+        name: p.name,
+        barcode: p.barcode ?? '',
+        type: p.type,
+        baseUnit: p.baseUnit,
+        sellingUnit: p.sellingUnit,
+        conversionFactor: p.conversionFactor,
+        piecesPerCarton: ppc,
+        cartonsInStock: p.stockInBaseUnit / ppc,
+        countPriceMode: 'piece',
+        countPriceAmount: p.pricePerPiece,
+        cost: p.cost,
+        lowStockInputMode: lowMode,
+        lowStockQuantity: baseStockToDisplayQuantity(
+          p.lowStockThreshold,
+          p.type,
+          p.conversionFactor,
+          ppc,
+          lowMode,
+        ),
+        hasExpiry: p.hasExpiry,
+        expiryDate: p.expiryDate ?? '',
+      });
+    } else {
+      const stockMode: StockInputMode = 'selling';
+      this.form.patchValue({
+        name: p.name,
+        barcode: p.barcode ?? '',
+        type: p.type,
+        baseUnit: p.baseUnit,
+        sellingUnit: p.sellingUnit,
+        conversionFactor: p.conversionFactor,
+        pricePerUnit: p.pricePerUnit,
+        cost: p.cost,
+        stockInputMode: stockMode,
+        stockQuantity: baseStockToDisplayQuantity(
+          p.stockInBaseUnit,
+          p.type,
+          p.conversionFactor,
+          ppc,
+          stockMode,
+        ),
+        lowStockInputMode: lowMode,
+        lowStockQuantity: baseStockToDisplayQuantity(
+          p.lowStockThreshold,
+          p.type,
+          p.conversionFactor,
+          ppc,
+          lowMode,
+        ),
+        hasExpiry: p.hasExpiry,
+        expiryDate: p.expiryDate ?? '',
+      });
+    }
+
+    this.lastLowStockMode = this.form.controls.lowStockInputMode.value;
+    this.showProductModal = true;
+  }
+
+  closeProductModal(): void {
+    this.showProductModal = false;
+    this.editingProduct.set(null);
+  }
+
+  private lowStockModeForProduct(p: Product): AdjustStockMode {
+    if (p.type === 'count') {
+      const ppc = Math.max(1, p.piecesPerCarton);
+      const asCartons = p.lowStockThreshold / ppc;
+      return asCartons >= 1 && Math.abs(asCartons - Math.round(asCartons)) < 0.001
+        ? 'carton'
+        : 'base';
+    }
+    return 'selling';
+  }
+
+  toggleRowMenu(id: string, event: Event): void {
+    event.stopPropagation();
+    this.openMenuId.update((cur) => (cur === id ? null : id));
+  }
+
+  closeRowMenu(): void {
+    this.openMenuId.set(null);
+  }
+
+  @HostListener('document:click')
+  onDocumentClick(): void {
+    this.closeRowMenu();
+  }
+
+  expiryLabel(p: Product): string {
+    return productExpiryTagLabel(p);
+  }
+
+  expirySeverity(p: Product): 'danger' | 'warn' | 'info' {
+    return productExpiryTagSeverity(p);
+  }
+
+  isExpired(p: Product): boolean {
+    return isProductExpired(p);
+  }
+
+  isExpiringSoon(p: Product): boolean {
+    return isProductExpiringSoon(p);
+  }
+
+  onProductBarcodeScanned(code: string): void {
+    const existing = findProductByBarcode(this.items(), code);
+    if (existing) {
+      this.openEditProduct(existing);
+      return;
+    }
+    this.openAddProductWithBarcode(code);
+  }
+
+  openAddProductWithBarcode(code: string): void {
+    this.openAddProduct();
+    this.form.patchValue({ barcode: code.trim() });
   }
 
   async deleteProduct(id: string, name: string): Promise<void> {
+    this.closeRowMenu();
     if (!confirm(`Delete product "${name}"?`)) {
       return;
     }

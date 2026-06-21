@@ -17,7 +17,12 @@
   --app-user-chip-bg: #f1f5f9;
   --app-user-chip-text: #475569;
   --app-sidebar-bg: #0f172a;
-  --app-sidebar-border: rgba(255, 255, 255, 0.06);
+  --app-sidebar-border: rgba(255, 255, 255, 0.1);
+  --app-sidebar-text: #f1f5f9;
+  --app-sidebar-text-muted: #cbd5e1;
+  --app-sidebar-text-active: #ffffff;
+  --app-sidebar-hover-bg: rgba(255, 255, 255, 0.1);
+  --app-sidebar-active-bg: rgba(56, 189, 248, 0.24);
   --app-text: #0f172a;
   --app-muted: #64748b;
   --app-border: #e2e8f0;
@@ -41,7 +46,12 @@ html.app-dark {
   --app-user-chip-bg: #1e293b;
   --app-user-chip-text: #cbd5e1;
   --app-sidebar-bg: #020617;
-  --app-sidebar-border: rgba(255, 255, 255, 0.06);
+  --app-sidebar-border: rgba(255, 255, 255, 0.1);
+  --app-sidebar-text: #f8fafc;
+  --app-sidebar-text-muted: #e2e8f0;
+  --app-sidebar-text-active: #ffffff;
+  --app-sidebar-hover-bg: rgba(255, 255, 255, 0.1);
+  --app-sidebar-active-bg: rgba(56, 189, 248, 0.28);
   --app-text: #f1f5f9;
   --app-muted: #94a3b8;
   --app-border: #1f2937;

@@ -1,0 +1,12 @@
+.page { max-width: 640px; margin: 0 auto; }
+.form { display: flex; flex-direction: column; gap: 0.85rem; margin-top: 1rem; }
+.field { display: flex; flex-direction: column; gap: 0.3rem; font-size: 0.85rem; font-weight: 600; }
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; }
+.input {
+  padding: 0.55rem 0.7rem;
+  border: 1px solid var(--app-border);
+  border-radius: 0.5rem;
+  background: var(--app-toolbar-bg);
+  color: var(--app-text);
+  font-weight: 400;
+}

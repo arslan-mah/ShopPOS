@@ -1,0 +1,15 @@
+@import '../expenses/expenses.component.scss';
+
+.type-badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  border-radius: 99px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  background: #eee;
+  &[data-type='sale'] { background: #fde8e8; color: #a33; }
+  &[data-type='purchase'] { background: #e8f4ec; color: var(--c-accent); }
+  &[data-type='refund'] { background: #e8eef4; color: #336; }
+  &[data-type='adjustment'] { background: #f5f0e8; color: #664; }
+}

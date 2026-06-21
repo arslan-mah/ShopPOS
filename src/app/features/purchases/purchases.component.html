@@ -1,0 +1,312 @@
+<div class="page">
+  <div class="add-btn-row">
+    <p-button type="button" label="Record purchase" icon="pi pi-plus" (onClick)="openAdd()" />
+  </div>
+
+  @if (error() && !showPurchaseModal && !showPayModal) {
+    <p-message severity="error" [text]="error()!" [closable]="false" styleClass="msg-banner" />
+  }
+
+  @if (totalSupplierCredit() > 0) {
+    <div class="credit-banner">
+      <span>Supplier credit outstanding:</span>
+      <strong>{{ totalSupplierCredit() | currency: 'PKR' : 'symbol-narrow' : '1.0-2' }}</strong>
+      <span class="muted">— use <strong>Pay supplier</strong> on each purchase row</span>
+    </div>
+  }
+
+  <p-dialog
+    [header]="isEditMode() ? 'Edit purchase' : 'Record purchase'"
+    [(visible)]="showPurchaseModal"
+    [modal]="true"
+    [closable]="true"
+    [dismissableMask]="true"
+    [style]="{ width: '48rem', maxWidth: '96vw' }"
+    [contentStyle]="{ padding: '0' }"
+    (onHide)="onAddClosed()"
+  >
+    <form class="form" [formGroup]="form" (ngSubmit)="savePurchase()">
+      <div class="form-body">
+        <div class="form-row">
+          <label class="field">
+            <span class="label">Supplier <span class="req">*</span></span>
+            <select class="input select w-full" formControlName="supplierId">
+              <option value="">Select supplier</option>
+              @for (s of suppliers(); track s.id) {
+                <option [value]="s.id">{{ s.name }}</option>
+              }
+            </select>
+          </label>
+          <label class="field">
+            <span class="label">Invoice # <span class="req">*</span></span>
+            <input pInputText fluid class="input w-full" formControlName="invoiceNumber" />
+          </label>
+        </div>
+
+        <app-barcode-scan-toolbar
+          [enabled]="showPurchaseModal"
+          hint="Scan product barcode to add a line"
+          (codeScanned)="onPurchaseBarcodeScanned($event)"
+        />
+
+        <div class="lines-header">
+          <span class="label">Line items</span>
+          <p-button type="button" label="Add line" icon="pi pi-plus" size="small" [outlined]="true" (onClick)="addLine()" />
+        </div>
+
+        @for (line of draftLines(); track line.key) {
+          <div class="line-row">
+            <select
+              class="input select"
+              [ngModel]="line.productId"
+              [ngModelOptions]="{ standalone: true }"
+              (ngModelChange)="updateLine($index, { productId: $event })"
+            >
+              <option value="">Product</option>
+              @for (p of products(); track p.id) {
+                <option [value]="p.id">{{ p.name }}</option>
+              }
+            </select>
+            <input
+              class="input qty"
+              type="number"
+              min="0.01"
+              step="any"
+              [ngModel]="line.quantity"
+              [ngModelOptions]="{ standalone: true }"
+              (ngModelChange)="updateLine($index, { quantity: +$event })"
+              title="Quantity"
+            />
+            <select
+              class="input select unit"
+              [ngModel]="line.unitLabel"
+              [ngModelOptions]="{ standalone: true }"
+              (ngModelChange)="updateLine($index, { unitLabel: $event })"
+            >
+              @for (u of unitOptions(line.productId); track $index) {
+                <option [value]="u.value">{{ u.label }}</option>
+              }
+            </select>
+            <input
+              class="input cost"
+              type="number"
+              min="0"
+              step="0.01"
+              [ngModel]="line.unitCost"
+              [ngModelOptions]="{ standalone: true }"
+              (ngModelChange)="updateLine($index, { unitCost: +$event })"
+              title="Unit cost"
+            />
+            <span class="line-total mono">{{ line.quantity * line.unitCost | currency: 'PKR' : 'symbol-narrow' : '1.0-2' }}</span>
+            @if (draftLines().length > 1) {
+              <p-button type="button" icon="pi pi-times" severity="danger" [text]="true" size="small" (onClick)="removeLine($index)" />
+            }
+          </div>
+        }
+
+        <div class="total-row">
+          <span class="label">Total</span>
+          <strong>{{ draftTotal() | currency: 'PKR' : 'symbol-narrow' : '1.0-2' }}</strong>
+        </div>
+
+        <div class="payment-section">
+          <span class="label">Payment</span>
+          <div class="payment-modes">
+            <button
+              type="button"
+              class="mode-btn"
+              [class.active]="paymentMode() === 'net'"
+              (click)="setPaymentMode('net')"
+            >
+              Net (pay in full)
+            </button>
+            <button
+              type="button"
+              class="mode-btn"
+              [class.active]="paymentMode() === 'credit'"
+              (click)="setPaymentMode('credit')"
+            >
+              Credit (on account)
+            </button>
+            <button
+              type="button"
+              class="mode-btn"
+              [class.active]="paymentMode() === 'partial'"
+              (click)="setPaymentMode('partial')"
+            >
+              Partial payment
+            </button>
+          </div>
+
+          @if (paymentMode() === 'partial') {
+            <div class="form-row payment-fields">
+              <label class="field">
+                <span class="label">Paid now</span>
+                <input
+                  class="input w-full"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  [value]="partialPaidAmount()"
+                  (input)="onPaidAmountInput($any($event.target).value)"
+                />
+              </label>
+              <label class="field">
+                <span class="label">Payment method</span>
+                <select class="input select w-full" formControlName="paymentMethod">
+                  <option value="cash">Cash</option>
+                  <option value="card">Card</option>
+                  <option value="bank">Bank transfer</option>
+                  <option value="other">Other</option>
+                </select>
+              </label>
+            </div>
+          } @else if (paymentMode() === 'net' && draftPaidAmount() > 0) {
+            <div class="form-row payment-fields">
+              <label class="field">
+                <span class="label">Payment method</span>
+                <select class="input select w-full" formControlName="paymentMethod">
+                  <option value="cash">Cash</option>
+                  <option value="card">Card</option>
+                  <option value="bank">Bank transfer</option>
+                  <option value="other">Other</option>
+                </select>
+              </label>
+            </div>
+          }
+
+          <div class="payment-summary">
+            <div class="summary-line">
+              <span class="muted">Paid</span>
+              <span class="mono">{{ draftPaidAmount() | currency: 'PKR' : 'symbol-narrow' : '1.0-2' }}</span>
+            </div>
+            <div class="summary-line" [class.has-credit]="draftRemainingAmount() > 0">
+              <span class="muted">Credit (owed to supplier)</span>
+              <strong class="mono">{{ draftRemainingAmount() | currency: 'PKR' : 'symbol-narrow' : '1.0-2' }}</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="form-actions">
+        <p-button
+          type="submit"
+          [label]="saving() ? 'Saving…' : (isEditMode() ? 'Save changes' : 'Save purchase')"
+          [loading]="saving()"
+          [disabled]="saving()"
+        />
+        @if (!saving()) {
+          <p-button type="button" label="Cancel" styleClass="p-button-secondary" [outlined]="true" (onClick)="closePurchaseModal()" />
+        }
+      </div>
+    </form>
+    @if (error()) {
+      <p-message severity="error" [text]="error()!" [closable]="false" styleClass="msg-banner" />
+    }
+  </p-dialog>
+
+  <p-dialog
+    header="Pay supplier"
+    [(visible)]="showPayModal"
+    [modal]="true"
+    [closable]="true"
+    [dismissableMask]="true"
+    [style]="{ width: '28rem', maxWidth: '96vw' }"
+    [contentStyle]="{ padding: '0' }"
+    (onHide)="closePayModal()"
+  >
+    @if (payingPurchase(); as p) {
+      <form class="form" [formGroup]="payForm" (ngSubmit)="submitSupplierPayment()">
+        <div class="form-body">
+          <p class="muted">
+            Invoice <strong>{{ p.invoiceNumber }}</strong> · {{ p.supplierName || 'Supplier' }} —
+            remaining
+            <strong>{{ p.remainingAmount | currency: 'PKR' : 'symbol-narrow' : '1.0-2' }}</strong>
+          </p>
+          <label class="field">
+            <span class="label">Payment amount <span class="req">*</span></span>
+            <input class="input w-full" type="number" formControlName="amount" min="0.01" step="0.01" />
+          </label>
+          <label class="field">
+            <span class="label">Payment method</span>
+            <select class="input select w-full" formControlName="paymentMethod">
+              <option value="cash">Cash</option>
+              <option value="card">Card</option>
+              <option value="bank">Bank transfer</option>
+              <option value="other">Other</option>
+            </select>
+          </label>
+        </div>
+        <div class="form-actions">
+          <p-button type="submit" label="Record payment" [loading]="saving()" [disabled]="saving()" />
+          @if (!saving()) {
+            <p-button type="button" label="Cancel" styleClass="p-button-secondary" [outlined]="true" (onClick)="closePayModal()" />
+          }
+        </div>
+      </form>
+    }
+    @if (error()) {
+      <p-message severity="error" [text]="error()!" [closable]="false" styleClass="msg-banner" />
+    }
+  </p-dialog>
+
+  <p-card styleClass="list-card">
+    <p-header>
+      <div class="list-header-inner">
+        <span class="list-title">Purchases</span>
+        <p-tag value="Live" severity="success" />
+      </div>
+    </p-header>
+
+    @if (loading() && purchases().length === 0) {
+      <div class="state-empty"><p>Loading purchases…</p></div>
+    } @else if (purchases().length === 0) {
+      <div class="state-empty"><p>No purchases recorded yet.</p></div>
+    } @else {
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Invoice</th>
+              <th>Supplier</th>
+              <th>Lines</th>
+              <th class="num">Total</th>
+              <th>Payment</th>
+              <th class="num">Paid</th>
+              <th class="num">Credit</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (p of purchases(); track p.id) {
+              <tr>
+                <td class="muted">{{ p.createdAt ? (p.createdAt | date: 'medium') : '—' }}</td>
+                <td class="mono">{{ p.invoiceNumber }}</td>
+                <td class="name-cell">{{ p.supplierName || '—' }}</td>
+                <td>
+                  @for (l of p.lines; track $index) {
+                    <div class="sub">{{ l.productName }} · {{ l.quantity }} {{ l.unitLabel }}</div>
+                  }
+                </td>
+                <td class="num mono">{{ p.total | currency: 'PKR' : 'symbol-narrow' : '1.0-2' }}</td>
+                <td>
+                  <p-tag [value]="purchasePaymentLabel(p)" [severity]="purchasePaymentSeverity(p)" />
+                </td>
+                <td class="num mono">{{ p.paidAmount | currency: 'PKR' : 'symbol-narrow' : '1.0-2' }}</td>
+                <td class="num mono" [class.credit-due]="p.remainingAmount > 0">
+                  {{ p.remainingAmount | currency: 'PKR' : 'symbol-narrow' : '1.0-2' }}
+                </td>
+                <td class="actions">
+                  <p-button type="button" label="Edit" size="small" [outlined]="true" icon="pi pi-pencil" (onClick)="openEdit(p)" />
+                  @if (p.remainingAmount > 0) {
+                    <p-button type="button" label="Pay" size="small" icon="pi pi-wallet" (onClick)="openPaySupplier(p)" />
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </p-card>
+</div>

@@ -1,0 +1,219 @@
+<div class="page">
+  <div class="top-bar">
+    <a routerLink="/customers" class="back-link">← Back to customers</a>
+  </div>
+
+  @if (error() && !showPaymentModal) {
+    <p-message severity="error" [text]="error()!" [closable]="false" styleClass="msg-banner" />
+  }
+
+  @if (loading() && !customer()) {
+    <div class="state-empty"><p>Loading customer…</p></div>
+  } @else if (customer(); as c) {
+    <p-card styleClass="profile-card">
+      <div class="profile-head">
+        <div>
+          <h1 class="profile-name">{{ c.fullName }}</h1>
+          <p class="muted">{{ c.phone || '—' }} · {{ c.address || '—' }}</p>
+          @if (c.cnic) {
+            <p class="muted mono">CNIC: {{ c.cnic }}</p>
+          }
+        </div>
+        <div class="credit-summary" [class.has-credit]="totalOutstanding() > 0">
+          <span class="credit-label">Total credit</span>
+          <strong class="credit-value mono">{{ totalOutstanding() | currency: 'PKR' : 'symbol-narrow' : '1.0-2' }}</strong>
+        </div>
+      </div>
+    </p-card>
+
+    @if (outstandingReceipts().length > 0) {
+      <p-card styleClass="list-card section-card">
+        <p-header>
+          <div class="list-header-inner">
+            <span class="list-title">Outstanding credit</span>
+            <p-tag [value]="outstandingReceipts().length + ' invoice(s)'" severity="warn" />
+          </div>
+        </p-header>
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Invoice</th>
+                <th>Date</th>
+                <th class="num">Total</th>
+                <th class="num">Paid</th>
+                <th class="num">Remaining</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (r of outstandingReceipts(); track r.id) {
+                <tr>
+                  <td class="mono linkish" (click)="openReceipt(r)">{{ r.invoiceNumber }}</td>
+                  <td class="muted">{{ r.createdAt ? (r.createdAt | date: 'mediumDate') : '—' }}</td>
+                  <td class="num mono">{{ r.totals.grandTotal | currency: 'PKR' : 'symbol-narrow' : '1.0-2' }}</td>
+                  <td class="num mono">{{ r.totals.paidAmount | currency: 'PKR' : 'symbol-narrow' : '1.0-2' }}</td>
+                  <td class="num mono outstanding">{{ r.totals.remainingAmount | currency: 'PKR' : 'symbol-narrow' : '1.0-2' }}</td>
+                  <td class="actions">
+                    <p-button type="button" label="Receive" size="small" icon="pi pi-wallet" (onClick)="openPayment(r)" />
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </p-card>
+    }
+
+    <p-card styleClass="list-card section-card">
+      <p-header>
+        <div class="list-header-inner">
+          <span class="list-title">Receipt history</span>
+          <p-tag [value]="customerReceipts().length + ' receipt(s)'" severity="info" />
+        </div>
+      </p-header>
+
+      @if (customerReceipts().length === 0) {
+        <div class="state-empty"><p>No receipts for this customer yet.</p></div>
+      } @else {
+        <div class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr>
+                <th>Invoice</th>
+                <th>Date</th>
+                <th>Type</th>
+                <th>Payment</th>
+                <th class="num">Total</th>
+                <th class="num">Paid</th>
+                <th class="num">Remaining</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (r of customerReceipts(); track r.id) {
+                <tr class="clickable" (click)="openReceipt(r)">
+                  <td class="mono">{{ r.invoiceNumber }}</td>
+                  <td class="muted">{{ r.createdAt ? (r.createdAt | date: 'medium') : '—' }}</td>
+                  <td>
+                    <p-tag [value]="receiptTypeLabel(r)" [severity]="receiptTypeSeverity(r)" />
+                  </td>
+                  <td>{{ paymentStatus(r) }}</td>
+                  <td class="num mono" [class.amount-negative]="r.totals.grandTotal < 0">
+                    {{ r.totals.grandTotal | currency: 'PKR' : 'symbol-narrow' : '1.0-2' }}
+                  </td>
+                  <td class="num mono">{{ r.totals.paidAmount | currency: 'PKR' : 'symbol-narrow' : '1.0-2' }}</td>
+                  <td class="num mono" [class.outstanding]="r.totals.remainingAmount > 0">
+                    {{ r.totals.remainingAmount | currency: 'PKR' : 'symbol-narrow' : '1.0-2' }}
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+    </p-card>
+  }
+
+  <p-dialog
+    header="Receive payment"
+    [(visible)]="showPaymentModal"
+    [modal]="true"
+    [closable]="true"
+    [dismissableMask]="true"
+    [style]="{ width: '28rem', maxWidth: '96vw' }"
+    [contentStyle]="{ padding: '0' }"
+    (onHide)="onPaymentClosed()"
+  >
+    @if (payingReceipt) {
+      <form class="form" [formGroup]="paymentForm" (ngSubmit)="submitPayment()">
+        <div class="form-body">
+          <p class="muted">
+            Invoice <strong>{{ payingReceipt.invoiceNumber }}</strong> —
+            remaining
+            <strong>{{ payingReceipt.totals.remainingAmount | currency: 'PKR' : 'symbol-narrow' : '1.0-2' }}</strong>
+          </p>
+          <label class="field">
+            <span class="label">Payment amount <span class="req">*</span></span>
+            <input class="input w-full" type="number" formControlName="amount" min="0.01" step="0.01" />
+          </label>
+        </div>
+        <div class="form-actions">
+          <p-button type="submit" label="Receive payment" [loading]="saving()" [disabled]="saving()" />
+          @if (!saving()) {
+            <p-button type="button" label="Cancel" styleClass="p-button-secondary" [outlined]="true" (onClick)="showPaymentModal = false" />
+          }
+        </div>
+      </form>
+    }
+    @if (error()) {
+      <p-message severity="error" [text]="error()!" [closable]="false" styleClass="msg-banner" />
+    }
+  </p-dialog>
+
+  <p-dialog
+    header="Receipt"
+    [visible]="showReceiptModal()"
+    (visibleChange)="showReceiptModal.set($event)"
+    [modal]="true"
+    [closable]="true"
+    [style]="{ width: '42rem', maxWidth: '96vw' }"
+    (onHide)="closeReceipt()"
+  >
+    @if (selectedReceipt(); as r) {
+      <div class="receipt-detail">
+        <div class="detail-row">
+          <span class="muted">Invoice</span>
+          <strong class="mono">{{ r.invoiceNumber }}</strong>
+        </div>
+        <div class="detail-row">
+          <span class="muted">Date</span>
+          <span>{{ r.createdAt ? (r.createdAt | date: 'medium') : '—' }}</span>
+        </div>
+        <div class="detail-row">
+          <span class="muted">Type</span>
+          <p-tag [value]="receiptTypeLabel(r)" [severity]="receiptTypeSeverity(r)" />
+        </div>
+        <div class="totals-grid">
+          <div class="total-box">
+            <span class="total-label">Grand total</span>
+            <strong class="mono">{{ r.totals.grandTotal | number: '1.2-2' }}</strong>
+          </div>
+          <div class="total-box">
+            <span class="total-label">Paid</span>
+            <strong class="mono">{{ r.totals.paidAmount | number: '1.2-2' }}</strong>
+          </div>
+          <div class="total-box">
+            <span class="total-label">Remaining</span>
+            <strong class="mono" [class.outstanding]="r.totals.remainingAmount > 0">{{ r.totals.remainingAmount | number: '1.2-2' }}</strong>
+          </div>
+        </div>
+        <div class="section-title">Products</div>
+        <div class="table-wrap">
+          <table class="table nested">
+            <thead>
+              <tr>
+                <th>Product</th>
+                <th>Qty</th>
+                <th class="num">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (l of r.lines; let i = $index; track l.productId + '-' + i) {
+                <tr>
+                  <td>{{ l.productName }}</td>
+                  <td class="mono">{{ l.quantity | number: '1.0-4' }} {{ l.unitLabel }}</td>
+                  <td class="num mono">{{ lineTotal(l) | number: '1.2-2' }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        @if (r.type === 'sale' && r.totals.remainingAmount > 0) {
+          <div class="detail-actions">
+            <p-button type="button" label="Receive payment" icon="pi pi-wallet" (onClick)="openPayment(r); closeReceipt()" />
+          </div>
+        }
+      </div>
+    }
+  </p-dialog>
+</div>

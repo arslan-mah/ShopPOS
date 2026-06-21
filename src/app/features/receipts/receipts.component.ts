@@ -374,6 +374,8 @@ export class ReceiptsComponent {
         grandTotal,
         paidAmount,
         remainingAmount,
+        totalCost: 0,
+        totalProfit: 0,
       },
       paymentMethod: this.form.controls.paymentMethod.value,
     };

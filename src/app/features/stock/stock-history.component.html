@@ -1,0 +1,57 @@
+<div class="page">
+  <div class="toolbar">
+    <select class="input select filter-input" [value]="productFilter()" (change)="productFilter.set($any($event.target).value)">
+      <option value="">All products</option>
+      @for (p of products(); track p.id) {
+        <option [value]="p.id">{{ p.name }}</option>
+      }
+    </select>
+    @if (productFilter()) {
+      <p-button type="button" label="Clear filter" [outlined]="true" size="small" (onClick)="clearFilter()" />
+    }
+  </div>
+
+  @if (error()) {
+    <p-message severity="error" [text]="error()!" [closable]="false" styleClass="msg-banner" />
+  }
+
+  <p-card styleClass="list-card">
+    <p-header>
+      <div class="list-header-inner">
+        <span class="list-title">Stock history</span>
+        <p-tag value="Live" severity="success" />
+      </div>
+    </p-header>
+
+    @if (loading() && movements().length === 0) {
+      <div class="state-empty"><p>Loading movements…</p></div>
+    } @else if (filteredMovements().length === 0) {
+      <div class="state-empty"><p>No stock movements found.</p></div>
+    } @else {
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Product</th>
+              <th>Type</th>
+              <th class="num">Qty (base)</th>
+              <th>Reference</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (m of filteredMovements(); track m.id) {
+              <tr>
+                <td class="muted">{{ m.createdAt ? (m.createdAt | date: 'medium') : '—' }}</td>
+                <td class="name-cell">{{ productName(m) }}</td>
+                <td><span class="type-badge" [attr.data-type]="m.type">{{ typeLabel(m.type) }}</span></td>
+                <td class="num mono">{{ m.quantity }}</td>
+                <td class="muted mono">{{ m.referenceId || '—' }}</td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </p-card>
+</div>

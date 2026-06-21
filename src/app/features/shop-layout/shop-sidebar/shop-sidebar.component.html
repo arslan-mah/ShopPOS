@@ -5,35 +5,49 @@
   </div>
 
   <mat-nav-list class="nav-list">
-    <a
-      mat-list-item
-      routerLink="/dashboard"
-      routerLinkActive="active-link"
-      [routerLinkActiveOptions]="{ exact: true }"
-    >
+    <a mat-list-item routerLink="/dashboard" routerLinkActive="active-link" [routerLinkActiveOptions]="{ exact: true }">
       <mat-icon matListItemIcon>dashboard</mat-icon>
       <span matListItemTitle>Dashboard</span>
     </a>
-    <a
-      mat-list-item
-      routerLink="/home"
-      routerLinkActive="active-link"
-      [routerLinkActiveOptions]="{ exact: true }"
-    >
-      <mat-icon matListItemIcon>home</mat-icon>
-      <span matListItemTitle>Home</span>
+    <a mat-list-item routerLink="/home" routerLinkActive="active-link" [routerLinkActiveOptions]="{ exact: true }">
+      <mat-icon matListItemIcon>point_of_sale</mat-icon>
+      <span matListItemTitle>Point of Sale</span>
     </a>
     <a mat-list-item routerLink="/products" routerLinkActive="active-link">
       <mat-icon matListItemIcon>inventory_2</mat-icon>
       <span matListItemTitle>Products</span>
     </a>
+    <a mat-list-item routerLink="/purchases" routerLinkActive="active-link">
+      <mat-icon matListItemIcon>local_shipping</mat-icon>
+      <span matListItemTitle>Purchases</span>
+    </a>
     <a mat-list-item routerLink="/customers" routerLinkActive="active-link">
       <mat-icon matListItemIcon>people</mat-icon>
       <span matListItemTitle>Customers</span>
     </a>
+    <a mat-list-item routerLink="/credit" routerLinkActive="active-link">
+      <mat-icon matListItemIcon>account_balance_wallet</mat-icon>
+      <span matListItemTitle>Credit Ledger</span>
+    </a>
     <a mat-list-item routerLink="/receipts" routerLinkActive="active-link">
       <mat-icon matListItemIcon>receipt_long</mat-icon>
       <span matListItemTitle>Receipts</span>
+    </a>
+    <a mat-list-item routerLink="/expenses" routerLinkActive="active-link">
+      <mat-icon matListItemIcon>payments</mat-icon>
+      <span matListItemTitle>Expenses</span>
+    </a>
+    <a mat-list-item routerLink="/suppliers" routerLinkActive="active-link">
+      <mat-icon matListItemIcon>store</mat-icon>
+      <span matListItemTitle>Suppliers</span>
+    </a>
+    <a mat-list-item routerLink="/stock-history" routerLinkActive="active-link">
+      <mat-icon matListItemIcon>history</mat-icon>
+      <span matListItemTitle>Stock History</span>
+    </a>
+    <a mat-list-item routerLink="/settings" routerLinkActive="active-link">
+      <mat-icon matListItemIcon>settings</mat-icon>
+      <span matListItemTitle>Settings</span>
     </a>
   </mat-nav-list>
 </div>

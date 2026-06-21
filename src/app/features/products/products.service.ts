@@ -13,6 +13,7 @@ import {
 import { Observable } from 'rxjs';
 import { REALTIME_DATABASE } from '../../core/firebase/firebase.tokens';
 import type { ReceiptLineItem } from '../receipts/receipts.service';
+import { StockMovementsService } from '../stock/stock-movements.service';
 
 export type ProductUnitType = 'weight' | 'volume' | 'count';
 
@@ -37,6 +38,7 @@ export interface Product {
   piecesPerCarton: number;
   hasExpiry: boolean;
   expiryDate: string | null;
+  barcode?: string;
   createdAt: Date | null;
 }
 
@@ -119,6 +121,7 @@ export function baseStockToDisplayQuantity(
 @Injectable({ providedIn: 'root' })
 export class ProductsService {
   private readonly db = inject(REALTIME_DATABASE);
+  private readonly stockMovements = inject(StockMovementsService);
 
   watchProducts(): Observable<Product[]> {
     const productsQuery = query(ref(this.db, 'products'), orderByChild('createdAt'));
@@ -157,6 +160,7 @@ export class ProductsService {
       expiryDate: draft.hasExpiry && draft.expiryDate ? draft.expiryDate : null,
       createdAt: serverTimestamp(),
     };
+    payload['barcode'] = draft.barcode?.trim() ?? '';
     payload['cost'] = draft.cost >= 0 ? draft.cost : 0;
     if (draft.type === 'count') {
       payload['pricePerPiece'] = draft.pricePerPiece;
@@ -168,12 +172,40 @@ export class ProductsService {
     await set(newRef, payload);
   }
 
+  async updateProduct(id: string, draft: ProductDraft): Promise<void> {
+    const payload: Record<string, unknown> = {
+      name: draft.name.trim(),
+      type: draft.type,
+      baseUnit: draft.baseUnit.trim(),
+      sellingUnit: draft.sellingUnit.trim(),
+      conversionFactor: draft.conversionFactor,
+      lowStockThreshold: draft.lowStockThreshold,
+      piecesPerCarton: draft.type === 'count' ? Math.max(1, draft.piecesPerCarton) : 1,
+      hasExpiry: draft.hasExpiry,
+      expiryDate: draft.hasExpiry && draft.expiryDate ? draft.expiryDate : null,
+      cost: draft.cost >= 0 ? draft.cost : 0,
+      barcode: draft.barcode?.trim() ?? '',
+    };
+    if (draft.type === 'count') {
+      payload['pricePerPiece'] = draft.pricePerPiece;
+      payload['pricePerUnit'] = 0;
+    } else {
+      payload['pricePerUnit'] = draft.pricePerUnit;
+      payload['pricePerPiece'] = 0;
+    }
+    await update(ref(this.db, `products/${id}`), payload);
+  }
+
   async updateStock(id: string, stockInBaseUnit: number): Promise<void> {
     await update(ref(this.db, `products/${id}`), { stockInBaseUnit });
   }
 
   /** Reduce stock after a sale based on receipt line qty + unit label. */
-  async deductStockForReceiptLines(lines: ReceiptLineItem[], products: Product[]): Promise<void> {
+  async deductStockForReceiptLines(
+    lines: ReceiptLineItem[],
+    products: Product[],
+    referenceId?: string,
+  ): Promise<void> {
     const byId = new Map(products.map((p) => [p.id, p]));
     const deductedByProduct = new Map<string, number>();
 
@@ -189,11 +221,22 @@ export class ProductsService {
       if (!p || deduct <= 0) continue;
       const next = Math.max(0, p.stockInBaseUnit - deduct);
       await this.updateStock(id, next);
+      await this.stockMovements.logMovement({
+        productId: id,
+        productName: p.name,
+        type: 'sale',
+        quantityInBaseUnit: deduct,
+        referenceId,
+      });
     }
   }
 
   /** Restore stock after a refund (negative-quantity receipt lines). */
-  async restoreStockForReceiptLines(lines: ReceiptLineItem[], products: Product[]): Promise<void> {
+  async restoreStockForReceiptLines(
+    lines: ReceiptLineItem[],
+    products: Product[],
+    referenceId?: string,
+  ): Promise<void> {
     const byId = new Map(products.map((p) => [p.id, p]));
     const restoredByProduct = new Map<string, number>();
 
@@ -209,6 +252,13 @@ export class ProductsService {
       if (!p || restore <= 0) continue;
       const next = p.stockInBaseUnit + restore;
       await this.updateStock(id, next);
+      await this.stockMovements.logMovement({
+        productId: id,
+        productName: p.name,
+        type: 'refund',
+        quantityInBaseUnit: restore,
+        referenceId,
+      });
     }
   }
 
@@ -264,6 +314,7 @@ function mapProductRecord(id: string, data: Record<string, unknown>): Product {
     piecesPerCarton,
     hasExpiry: bool(data, 'hasExpiry', false),
     expiryDate: parseExpiryDate(data['expiryDate']),
+    barcode: str(data, 'barcode') || undefined,
     createdAt: parseCreatedAt(data['createdAt']),
   };
 }

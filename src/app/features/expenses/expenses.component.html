@@ -1,0 +1,158 @@
+<div class="page">
+  <div class="toolbar">
+    <p-button type="button" label="Add expense" icon="pi pi-plus" (onClick)="openAdd()" />
+    <div class="filters">
+      <input
+        pInputText
+        class="input filter-input"
+        type="search"
+        placeholder="Search…"
+        [value]="search()"
+        (input)="search.set($any($event.target).value)"
+      />
+      <select class="input select" [value]="categoryFilter()" (change)="categoryFilter.set($any($event.target).value)">
+        <option value="">All categories</option>
+        @for (c of categories(); track c.id) {
+          <option [value]="c.id">{{ c.name }}</option>
+        }
+      </select>
+      <input
+        class="input"
+        type="date"
+        [value]="dateFrom()"
+        (change)="dateFrom.set($any($event.target).value)"
+        title="From date"
+      />
+      <input
+        class="input"
+        type="date"
+        [value]="dateTo()"
+        (change)="dateTo.set($any($event.target).value)"
+        title="To date"
+      />
+      <p-button type="button" label="Clear" [outlined]="true" size="small" (onClick)="clearFilters()" />
+    </div>
+  </div>
+
+  @if (error() && !showFormModal) {
+    <p-message severity="error" [text]="error()!" [closable]="false" styleClass="msg-banner" />
+  }
+
+  <p-dialog
+    [header]="editingId ? 'Edit expense' : 'Add expense'"
+    [(visible)]="showFormModal"
+    [modal]="true"
+    [closable]="true"
+    [dismissableMask]="true"
+    [style]="{ width: '40rem', maxWidth: '96vw' }"
+    [contentStyle]="{ padding: '0' }"
+    (onHide)="onFormClosed()"
+  >
+    <form class="form" [formGroup]="form" (ngSubmit)="saveExpense()">
+      <div class="form-body">
+        <label class="field">
+          <span class="label">Category</span>
+          <select class="input select w-full" formControlName="categoryId">
+            <option value="">Uncategorized</option>
+            @for (c of categories(); track c.id) {
+              <option [value]="c.id">{{ c.name }}</option>
+            }
+          </select>
+        </label>
+        <label class="field">
+          <span class="label">Title <span class="req">*</span></span>
+          <input pInputText fluid class="input w-full" formControlName="title" />
+        </label>
+        <label class="field">
+          <span class="label">Description</span>
+          <textarea pTextarea fluid class="input w-full" formControlName="description" rows="2"></textarea>
+        </label>
+        <div class="form-row">
+          <label class="field">
+            <span class="label">Amount <span class="req">*</span></span>
+            <input class="input w-full" type="number" formControlName="amount" min="0.01" step="0.01" />
+          </label>
+          <label class="field">
+            <span class="label">Payment method</span>
+            <select class="input select w-full" formControlName="paymentMethod">
+              @for (m of paymentMethods; track m) {
+                <option [value]="m">{{ m }}</option>
+              }
+            </select>
+          </label>
+        </div>
+        <label class="field">
+          <span class="label">Date <span class="req">*</span></span>
+          <input class="input w-full" type="date" formControlName="date" />
+        </label>
+      </div>
+      <div class="form-actions">
+        <p-button
+          type="submit"
+          [label]="saving() ? 'Saving…' : editingId ? 'Update' : 'Add expense'"
+          [loading]="saving()"
+          [disabled]="saving()"
+        />
+        @if (!saving()) {
+          <p-button type="button" label="Cancel" styleClass="p-button-secondary" [outlined]="true" (onClick)="showFormModal = false" />
+        }
+      </div>
+    </form>
+    @if (error()) {
+      <p-message severity="error" [text]="error()!" [closable]="false" styleClass="msg-banner" />
+    }
+  </p-dialog>
+
+  <p-card styleClass="list-card">
+    <p-header>
+      <div class="list-header-inner">
+        <span class="list-title">Expenses</span>
+        <div class="header-meta">
+          <span class="muted">Total: {{ filteredTotal() | currency: 'PKR' : 'symbol-narrow' : '1.0-0' }}</span>
+          <p-tag value="Live" severity="success" />
+        </div>
+      </div>
+    </p-header>
+
+    @if (loading() && items().length === 0) {
+      <div class="state-empty"><p>Loading expenses…</p></div>
+    } @else if (filteredItems().length === 0) {
+      <div class="state-empty"><p>No expenses match your filters.</p></div>
+    } @else {
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Date</th>
+              <th>Title</th>
+              <th>Category</th>
+              <th>Payment</th>
+              <th class="num">Amount</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (e of filteredItems(); track e.id) {
+              <tr>
+                <td class="muted">{{ e.date ? (e.date | date: 'mediumDate') : '—' }}</td>
+                <td class="name-cell">
+                  {{ e.title }}
+                  @if (e.description) {
+                    <div class="sub muted">{{ e.description }}</div>
+                  }
+                </td>
+                <td>{{ categoryName(e.categoryId) }}</td>
+                <td>{{ e.paymentMethod }}</td>
+                <td class="num mono">{{ e.amount | currency: 'PKR' : 'symbol-narrow' : '1.0-2' }}</td>
+                <td class="actions">
+                  <p-button type="button" label="Edit" [outlined]="true" size="small" icon="pi pi-pencil" (onClick)="openEdit(e)" />
+                  <p-button type="button" label="Delete" severity="danger" [outlined]="true" size="small" icon="pi pi-trash" (onClick)="deleteExpense(e)" />
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </p-card>
+</div>

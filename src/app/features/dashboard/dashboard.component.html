@@ -36,19 +36,28 @@
     <article class="metric-card">
       <div class="metric-top">
         <span class="metric-icon">💵</span>
-        <span class="metric-trend up">+8% ↑</span>
       </div>
-      <div class="metric-label">Profit (Est.)</div>
-      <div class="metric-value profit">{{ profitDisplay }}</div>
+      <div class="metric-label">Gross Profit (Month)</div>
+      <div class="metric-value profit">{{ formatRs(monthlyGrossProfit()) }}</div>
     </article>
 
     <article class="metric-card">
       <div class="metric-top">
         <span class="metric-icon">🧾</span>
-        <span class="metric-trend down">-2% ↓</span>
       </div>
-      <div class="metric-label">Expenses</div>
-      <div class="metric-value">{{ expensesDisplay }}</div>
+      <div class="metric-label">Expenses (Month)</div>
+      <div class="metric-value">{{ formatRs(monthlyExpenses()) }}</div>
+      <div class="metric-sub">Today: {{ formatRs(todayExpenses()) }}</div>
+    </article>
+
+    <article class="metric-card">
+      <div class="metric-top">
+        <span class="metric-icon">📊</span>
+      </div>
+      <div class="metric-label">Net Profit (Month)</div>
+      <div class="metric-value" [class.profit]="monthlyNetProfit() >= 0" [class.danger]="monthlyNetProfit() < 0">
+        {{ formatRs(monthlyNetProfit()) }}
+      </div>
     </article>
 
     <article class="metric-card">
@@ -58,6 +67,24 @@
       <div class="metric-label">Total Customers</div>
       <div class="metric-value">{{ totalCustomers() }}</div>
       <div class="metric-sub">{{ newCustomersThisMonth() }} new this month</div>
+    </article>
+
+    <article class="metric-card">
+      <div class="metric-top">
+        <span class="metric-icon">🚚</span>
+      </div>
+      <div class="metric-label">Purchases Paid (Month)</div>
+      <div class="metric-value">{{ formatRs(monthlyPurchasePaid()) }}</div>
+      <div class="metric-sub muted-text">Cash paid to suppliers for stock</div>
+    </article>
+
+    <article class="metric-card alert-card">
+      <div class="metric-top">
+        <span class="metric-icon warn">📋</span>
+      </div>
+      <div class="metric-label">Supplier Credit</div>
+      <div class="metric-value danger">{{ formatRs(supplierCreditOutstanding()) }}</div>
+      <div class="metric-sub danger-text">Owed to suppliers</div>
     </article>
 
     <article class="metric-card alert-card">
@@ -126,6 +153,45 @@
           }
         </ul>
       }
+    </article>
+  </section>
+
+  <section class="analytics-grid">
+    <article class="panel">
+      <div class="panel-head"><h2 class="panel-title">Top Selling Products</h2></div>
+      @if (topSellingProducts().length === 0) {
+        <div class="panel-empty">No sales data yet.</div>
+      } @else {
+        <ul class="rank-list">
+          @for (p of topSellingProducts(); track p.id) {
+            <li><span>{{ p.name }}</span><strong>{{ p.qty }} sold · {{ formatRs(p.revenue) }}</strong></li>
+          }
+        </ul>
+      }
+    </article>
+    <article class="panel">
+      <div class="panel-head"><h2 class="panel-title">Payment Methods (Month)</h2></div>
+      <ul class="rank-list">
+        @for (row of paymentBreakdown(); track row[0]) {
+          <li><span>{{ row[0] }}</span><strong>{{ formatRs(row[1]) }}</strong></li>
+        }
+      </ul>
+    </article>
+    <article class="panel">
+      <div class="panel-head"><h2 class="panel-title">Expiry Alerts</h2></div>
+      @if (expiryAlerts().length === 0) {
+        <div class="panel-empty">No products expiring within 30 days.</div>
+      } @else {
+        <ul class="rank-list">
+          @for (p of expiryAlerts(); track p.id) {
+            <li><span>{{ p.name }}</span><strong>{{ p.expiryDate }}</strong></li>
+          }
+        </ul>
+      }
+    </article>
+    <article class="panel">
+      <div class="panel-head"><h2 class="panel-title">30-Day Revenue</h2></div>
+      <div class="big-stat">{{ formatRs(revenueLast30Days()) }}</div>
     </article>
   </section>
 

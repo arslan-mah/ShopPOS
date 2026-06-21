@@ -36,11 +36,46 @@ export const routes: Routes = [
           import('./features/customers/customers.component').then((m) => m.CustomersComponent),
       },
       {
+        path: 'customers/:id',
+        loadComponent: () =>
+          import('./features/customers/customer-detail.component').then((m) => m.CustomerDetailComponent),
+      },
+      {
         path: 'receipts',
         component: ReceiptsListComponent,
       },
       { path: 'receipts/list', redirectTo: 'receipts', pathMatch: 'full' },
       { path: 'receipts/:id', redirectTo: 'receipts', pathMatch: 'full' },
+      {
+        path: 'expenses',
+        loadComponent: () =>
+          import('./features/expenses/expenses.component').then((m) => m.ExpensesComponent),
+      },
+      {
+        path: 'suppliers',
+        loadComponent: () =>
+          import('./features/suppliers/suppliers.component').then((m) => m.SuppliersComponent),
+      },
+      {
+        path: 'purchases',
+        loadComponent: () =>
+          import('./features/purchases/purchases.component').then((m) => m.PurchasesComponent),
+      },
+      {
+        path: 'credit',
+        loadComponent: () =>
+          import('./features/credit/credit-ledger.component').then((m) => m.CreditLedgerComponent),
+      },
+      {
+        path: 'stock-history',
+        loadComponent: () =>
+          import('./features/stock/stock-history.component').then((m) => m.StockHistoryComponent),
+      },
+      {
+        path: 'settings',
+        loadComponent: () =>
+          import('./features/settings/settings.component').then((m) => m.SettingsComponent),
+      },
     ],
   },
   { path: '**', redirectTo: '/dashboard' },

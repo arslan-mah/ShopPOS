@@ -1,0 +1,35 @@
+<div class="page">
+  <p-card header="Shop Settings" subheader="Used on receipts and invoices">
+    @if (error()) {
+      <p-message severity="error" [text]="error()!" [closable]="false" />
+    }
+    @if (success()) {
+      <p-message severity="success" [text]="success()!" [closable]="false" />
+    }
+    <form class="form" [formGroup]="form" (ngSubmit)="save()">
+      <label class="field">
+        <span>Shop name</span>
+        <input class="input" type="text" formControlName="shopName" />
+      </label>
+      <label class="field">
+        <span>Address</span>
+        <input class="input" type="text" formControlName="address" />
+      </label>
+      <label class="field">
+        <span>Phone</span>
+        <input class="input" type="tel" formControlName="phone" />
+      </label>
+      <div class="row">
+        <label class="field">
+          <span>Default tax %</span>
+          <input class="input" type="number" formControlName="taxPercent" min="0" step="0.01" />
+        </label>
+        <label class="field">
+          <span>Currency</span>
+          <input class="input" type="text" formControlName="currency" />
+        </label>
+      </div>
+      <p-button type="submit" label="Save settings" [loading]="saving()" />
+    </form>
+  </p-card>
+</div>

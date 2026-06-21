@@ -13,15 +13,17 @@ import { AuthService } from '../../core/auth/auth.service';
 import { mapDataErrorMessage } from '../../core/firebase/map-data-error-message';
 import { Customer, CustomersService } from '../customers/customers.service';
 import { Product, ProductsService, soldQuantityToBaseUnits } from '../products/products.service';
+import { isProductExpired as productIsExpired } from '../products/product-expiry.util';
+import { computeReceiptProfitTotals } from '../receipts/receipt-math';
 import {
   ReceiptCustomerRef,
   ReceiptDraft,
   ReceiptLineItem,
   ReceiptsService,
 } from '../receipts/receipts.service';
-
-const DEFAULT_SHOP_NAME = 'My Shop';
-const DEFAULT_SHOP_ADDRESS = '';
+import { DEFAULT_SHOP_SETTINGS, ShopSettingsService } from '../settings/shop-settings.service';
+import { BarcodeScanToolbarComponent } from '../../shared/barcode/barcode-scan-toolbar.component';
+import { findProductByBarcode } from '../../shared/barcode/barcode.util';
 
 type CartLine = {
   productId: string;
@@ -33,6 +35,8 @@ type CartLine = {
   taxPercent: number;
   unitLabel: string;
 };
+
+type CheckoutPaymentMode = 'net' | 'credit' | 'partial';
 
 function generateInvoiceNumber(): string {
   const rnd = Math.floor(Math.random() * 1_000_000);
@@ -62,6 +66,7 @@ function lineTotal(l: CartLine): number {
     InputTextModule,
     MessageModule,
     TagModule,
+    BarcodeScanToolbarComponent,
   ],
   templateUrl: './home.component.html',
   styleUrl: './home.component.scss',
@@ -73,7 +78,10 @@ export class HomeComponent {
   private readonly productsService = inject(ProductsService);
   private readonly customersService = inject(CustomersService);
   private readonly receiptsService = inject(ReceiptsService);
+  private readonly shopSettingsService = inject(ShopSettingsService);
   private readonly router = inject(Router);
+
+  readonly shopSettings = signal(DEFAULT_SHOP_SETTINGS);
 
   readonly loading = signal(true);
   readonly saving = signal(false);
@@ -92,6 +100,8 @@ export class HomeComponent {
 
   readonly showCheckoutModal = signal(false);
   readonly selectedCustomerId = signal<string | null>(null);
+  readonly checkoutPaymentMode = signal<CheckoutPaymentMode>('net');
+  readonly checkoutPartialPaidAmount = signal(0);
 
   readonly productForm = this.fb.nonNullable.group({
     quantity: [1, [Validators.required, Validators.min(0.0001)]],
@@ -109,7 +119,11 @@ export class HomeComponent {
     const q = this.productSearch().trim().toLowerCase();
     const all = this.products();
     if (!q) return all;
-    return all.filter((p) => p.name.toLowerCase().includes(q));
+    return all.filter(
+      (p) =>
+        p.name.toLowerCase().includes(q) ||
+        (p.barcode || '').toLowerCase().includes(q),
+    );
   });
 
   readonly filteredCustomers = computed(() => {
@@ -134,6 +148,22 @@ export class HomeComponent {
 
   readonly cartGrandTotal = computed(() =>
     this.cart().reduce((sum, l) => sum + lineTotal(l), 0),
+  );
+
+  readonly checkoutPaidAmount = computed(() => {
+    const total = this.cartGrandTotal();
+    const mode = this.checkoutPaymentMode();
+    if (mode === 'net') return total;
+    if (mode === 'credit') return 0;
+    return Math.min(total, Math.max(0, this.checkoutPartialPaidAmount()));
+  });
+
+  readonly checkoutRemainingAmount = computed(() =>
+    Math.max(0, this.cartGrandTotal() - this.checkoutPaidAmount()),
+  );
+
+  readonly posScanEnabled = computed(
+    () => !this.showCheckoutModal() && !this.showProductModal() && !this.saving(),
   );
 
   constructor() {
@@ -170,6 +200,13 @@ export class HomeComponent {
         next: (rows) => this.customers.set(rows),
         error: (err: unknown) => this.error.set(mapDataErrorMessage(err)),
       });
+
+    this.shopSettingsService
+      .watchSettings()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe({
+        next: (s) => this.shopSettings.set(s),
+      });
   }
 
   productDisplayPrice(p: Product): number {
@@ -188,12 +225,21 @@ export class HomeComponent {
     return p.stockInBaseUnit <= 0;
   }
 
+  isProductExpired(p: Product): boolean {
+    return productIsExpired(p);
+  }
+
+  isProductUnavailable(p: Product): boolean {
+    return this.isProductOutOfStock(p) || this.isProductExpired(p);
+  }
+
   isProductLowStock(p: Product): boolean {
-    if (p.stockInBaseUnit <= 0) return false;
+    if (this.isProductUnavailable(p)) return false;
     return p.stockInBaseUnit <= p.lowStockThreshold;
   }
 
   stockBadgeLabel(p: Product): string {
+    if (this.isProductExpired(p)) return 'EXPIRED';
     if (this.isProductOutOfStock(p)) return 'OUT OF STOCK';
     if (this.isProductLowStock(p)) return 'LOW STOCK';
     const qty = Math.floor(this.productSellableQuantity(p));
@@ -201,6 +247,7 @@ export class HomeComponent {
   }
 
   stockBadgeClass(p: Product): string {
+    if (this.isProductExpired(p)) return 'badge-expired';
     if (this.isProductOutOfStock(p)) return 'badge-out';
     if (this.isProductLowStock(p)) return 'badge-low';
     return 'badge-in';
@@ -250,7 +297,8 @@ export class HomeComponent {
   }
 
   openProductModal(p: Product): void {
-    if (this.isProductOutOfStock(p)) return;
+    if (this.isProductUnavailable(p)) return;
+    this.error.set(null);
     this.selectedProduct.set(p);
     this.productForm.reset({
       quantity: 1,
@@ -385,6 +433,19 @@ export class HomeComponent {
     return l ? lineTotal(l) : 0;
   }
 
+  onPosBarcodeScanned(code: string): void {
+    const product = findProductByBarcode(this.products(), code);
+    if (!product) {
+      this.error.set(`No product found for barcode "${code}".`);
+      return;
+    }
+    if (this.isProductUnavailable(product)) {
+      this.error.set(`${product.name} is out of stock or expired.`);
+      return;
+    }
+    this.openProductModal(product);
+  }
+
   openCheckout(): void {
     if (this.cart().length === 0) {
       this.error.set('Cart is empty. Add products first.');
@@ -393,10 +454,42 @@ export class HomeComponent {
     this.error.set(null);
     this.selectedCustomerId.set(null);
     this.customerSearch.set('');
-    this.checkoutForm.patchValue({
-      paidAmount: this.cartGrandTotal(),
+    this.checkoutPaymentMode.set('net');
+    const total = this.cartGrandTotal();
+    this.checkoutPartialPaidAmount.set(total);
+    this.checkoutForm.reset({
+      paidAmount: total,
+      paymentMethod: 'cash',
     });
     this.showCheckoutModal.set(true);
+  }
+
+  setCheckoutPaymentMode(mode: CheckoutPaymentMode): void {
+    this.checkoutPaymentMode.set(mode);
+    const total = this.cartGrandTotal();
+    if (mode === 'net') {
+      this.checkoutPartialPaidAmount.set(total);
+      this.checkoutForm.patchValue({ paidAmount: total });
+    } else if (mode === 'credit') {
+      this.checkoutPartialPaidAmount.set(0);
+      this.checkoutForm.patchValue({ paidAmount: 0 });
+    } else {
+      const paid = this.checkoutPartialPaidAmount();
+      if (paid <= 0 || paid >= total) {
+        this.checkoutPartialPaidAmount.set(0);
+        this.checkoutForm.patchValue({ paidAmount: 0 });
+      }
+    }
+  }
+
+  onCheckoutPaidAmountInput(value: string): void {
+    const parsed = Number(value);
+    const paid = Number.isFinite(parsed) ? Math.max(0, parsed) : 0;
+    this.checkoutPartialPaidAmount.set(paid);
+    this.checkoutForm.patchValue({ paidAmount: paid });
+    if (this.checkoutPaymentMode() !== 'partial') {
+      this.checkoutPaymentMode.set('partial');
+    }
   }
 
   closeCheckout(): void {
@@ -441,8 +534,21 @@ export class HomeComponent {
     if (this.cart().length === 0) return;
 
     const grandTotal = this.cartGrandTotal();
-    const paidAmount = Math.max(0, this.checkoutForm.controls.paidAmount.value);
-    const remainingAmount = grandTotal - paidAmount;
+    const paidAmount = this.checkoutPaidAmount();
+    const remainingAmount = Math.max(0, grandTotal - paidAmount);
+
+    if (this.checkoutPaymentMode() === 'partial' && paidAmount <= 0) {
+      this.error.set('Enter the amount paid now, or choose Full credit.');
+      return;
+    }
+    if (paidAmount > grandTotal) {
+      this.error.set('Paid amount cannot exceed order total.');
+      return;
+    }
+    if (remainingAmount > 0 && !this.selectedCustomerId()) {
+      this.error.set('Select a registered customer for credit sales.');
+      return;
+    }
 
     const lines: ReceiptLineItem[] = this.cart().map((l) => ({
       productId: l.productId,
@@ -454,13 +560,16 @@ export class HomeComponent {
       taxPercent: l.taxPercent,
     }));
 
+    const profitTotals = computeReceiptProfitTotals(lines, this.products());
+
+    const settings = this.shopSettings();
     const draft: ReceiptDraft = {
-      shopName: DEFAULT_SHOP_NAME,
-      shopAddress: DEFAULT_SHOP_ADDRESS,
+      shopName: settings.shopName,
+      shopAddress: settings.address,
       invoiceNumber: generateInvoiceNumber(),
       customer: this.buildCustomerRef(),
       lines,
-      totals: { grandTotal, paidAmount, remainingAmount },
+      totals: { grandTotal, paidAmount, remainingAmount, ...profitTotals },
       paymentMethod: this.checkoutForm.controls.paymentMethod.value,
     };
 
@@ -468,8 +577,8 @@ export class HomeComponent {
     this.error.set(null);
     try {
       await this.auth.ensureSessionForDatabase();
-      await this.receiptsService.addReceipt(draft);
-      await this.productsService.deductStockForReceiptLines(lines, this.products());
+      const receiptId = await this.receiptsService.addReceipt(draft);
+      await this.productsService.deductStockForReceiptLines(lines, this.products(), receiptId);
       this.cart.set([]);
       this.showCheckoutModal.set(false);
       void this.router.navigateByUrl('/receipts');

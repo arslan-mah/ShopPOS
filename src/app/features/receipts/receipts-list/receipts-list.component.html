@@ -13,6 +13,12 @@
       </label>
     </div>
 
+    <app-barcode-scan-toolbar
+      [enabled]="receiptScanEnabled()"
+      hint="Scanner ready — scan receipt QR code to open invoice"
+      (codeScanned)="onReceiptBarcodeScanned($event)"
+    />
+
     @if (error()) {
       <p-message severity="error" [text]="error()!" [closable]="false" styleClass="msg-banner" />
     }
@@ -193,6 +199,9 @@
         />
       </div>
     }
+    <div class="detail-actions">
+      <p-button type="button" label="Print" icon="pi pi-print" severity="secondary" [outlined]="true" (onClick)="printDetail()" />
+    </div>
   }
 </p-dialog>
 

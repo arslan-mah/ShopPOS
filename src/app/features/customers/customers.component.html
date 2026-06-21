@@ -9,11 +9,14 @@
       styleClass="add-customer-btn"
       (onClick)="showAddCustomerModal = true"
     />
+    @if (items().length > 0) {
+      <p-button type="button" label="Export CSV" icon="pi pi-download" severity="secondary" [outlined]="true" (onClick)="exportCustomersCsv()" />
+    }
   </div>
 
   <!-- ── Add Customer Dialog ── -->
   <p-dialog
-    header="Add Customer"
+    [header]="editingCustomerId ? 'Edit Customer' : 'Add Customer'"
     [(visible)]="showAddCustomerModal"
     [modal]="true"
     [closable]="true"
@@ -22,7 +25,7 @@
     [contentStyle]="{padding:'0'}"
     (onHide)="onModalClosed()"
   >
-    <form class="form" [formGroup]="form" (ngSubmit)="addCustomer()">
+    <form class="form" [formGroup]="form" (ngSubmit)="saveCustomer()">
       <div class="form-body">
 
         <!-- Full name -->
@@ -96,7 +99,7 @@
       <div class="form-actions">
         <p-button
           type="submit"
-          [label]="saving() ? 'Saving…' : 'Add customer'"
+          [label]="saving() ? 'Saving…' : (editingCustomerId ? 'Save changes' : 'Add customer')"
           [loading]="saving()"
           [disabled]="saving()"
           icon="pi pi-user-plus"
@@ -147,6 +150,7 @@
               <th>Address</th>
               <th>Phone</th>
               <th>CNIC</th>
+              <th class="num">Credit</th>
               <th>Created</th>
               <th></th>
             </tr>
@@ -154,12 +158,35 @@
           <tbody>
             @for (c of items(); track c.id) {
               <tr>
-                <td class="name-cell">{{ c.fullName }}</td>
+                <td class="name-cell">
+                  <button type="button" class="name-link" (click)="openCustomer(c)">{{ c.fullName }}</button>
+                </td>
                 <td class="cell-address muted">{{ c.address || '—' }}</td>
                 <td>{{ c.phone || '—' }}</td>
                 <td class="mono">{{ c.cnic || '—' }}</td>
+                <td class="num mono" [class.credit-due]="customerCredit(c.id) > 0">
+                  {{ customerCredit(c.id) | currency: 'PKR' : 'symbol-narrow' : '1.0-2' }}
+                </td>
                 <td class="muted">{{ c.createdAt ? (c.createdAt | date: 'medium') : '—' }}</td>
                 <td class="actions">
+                  <p-button
+                    type="button"
+                    label="View"
+                    severity="info"
+                    [outlined]="true"
+                    size="small"
+                    icon="pi pi-eye"
+                    (onClick)="openCustomer(c)"
+                  />
+                  <p-button
+                    type="button"
+                    label="Edit"
+                    severity="secondary"
+                    [outlined]="true"
+                    size="small"
+                    icon="pi pi-pencil"
+                    (onClick)="openEditCustomer(c)"
+                  />
                   <p-button
                     type="button"
                     label="Delete"

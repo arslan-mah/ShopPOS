@@ -1,5 +1,5 @@
 import { inject, Injectable } from '@angular/core';
-import { onValue, orderByChild, push, query, ref, remove, serverTimestamp, set } from 'firebase/database';
+import { onValue, orderByChild, push, query, ref, remove, serverTimestamp, set, update } from 'firebase/database';
 import { Observable } from 'rxjs';
 import { REALTIME_DATABASE } from '../../core/firebase/firebase.tokens';
 
@@ -49,6 +49,15 @@ export class CustomersService {
       phone: phone.trim(),
       cnic: cnic.trim(),
       createdAt: serverTimestamp(),
+    });
+  }
+
+  async updateCustomer(id: string, fullName: string, address: string, phone: string, cnic: string): Promise<void> {
+    await update(ref(this.db, `customers/${id}`), {
+      fullName: fullName.trim(),
+      address: address.trim(),
+      phone: phone.trim(),
+      cnic: cnic.trim(),
     });
   }
 

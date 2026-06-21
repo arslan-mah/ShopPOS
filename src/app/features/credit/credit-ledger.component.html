@@ -1,0 +1,99 @@
+<div class="page">
+  @if (error() && !showPaymentModal) {
+    <p-message severity="error" [text]="error()!" [closable]="false" styleClass="msg-banner" />
+  }
+
+  <p-dialog
+    header="Receive payment"
+    [(visible)]="showPaymentModal"
+    [modal]="true"
+    [closable]="true"
+    [dismissableMask]="true"
+    [style]="{ width: '28rem', maxWidth: '96vw' }"
+    [contentStyle]="{ padding: '0' }"
+    (onHide)="onPaymentClosed()"
+  >
+    @if (payingReceipt) {
+      <form class="form" [formGroup]="paymentForm" (ngSubmit)="submitPayment()">
+        <div class="form-body">
+          <p class="muted">
+            Invoice <strong>{{ payingReceipt.invoiceNumber }}</strong> —
+            remaining
+            <strong>{{ payingReceipt.totals.remainingAmount | currency: 'PKR' : 'symbol-narrow' : '1.0-2' }}</strong>
+          </p>
+          <label class="field">
+            <span class="label">Payment amount <span class="req">*</span></span>
+            <input class="input w-full" type="number" formControlName="amount" min="0.01" step="0.01" />
+          </label>
+        </div>
+        <div class="form-actions">
+          <p-button type="submit" label="Receive payment" [loading]="saving()" [disabled]="saving()" />
+          @if (!saving()) {
+            <p-button type="button" label="Cancel" styleClass="p-button-secondary" [outlined]="true" (onClick)="showPaymentModal = false" />
+          }
+        </div>
+      </form>
+    }
+    @if (error()) {
+      <p-message severity="error" [text]="error()!" [closable]="false" styleClass="msg-banner" />
+    }
+  </p-dialog>
+
+  <p-card styleClass="list-card">
+    <p-header>
+      <div class="list-header-inner">
+        <span class="list-title">Credit ledger</span>
+        <div class="header-meta">
+          <span class="muted">Outstanding: {{ totalOutstanding() | currency: 'PKR' : 'symbol-narrow' : '1.0-0' }}</span>
+          <p-tag value="Live" severity="success" />
+        </div>
+      </div>
+    </p-header>
+
+    @if (loading() && receipts().length === 0) {
+      <div class="state-empty"><p>Loading credit data…</p></div>
+    } @else if (customerGroups().length === 0) {
+      <div class="state-empty"><p>No outstanding credit balances.</p></div>
+    } @else {
+      @for (g of customerGroups(); track g.customerId) {
+        <div class="customer-block">
+          <div class="customer-head">
+            <div>
+              <div class="name-cell">{{ g.customerName }}</div>
+              @if (g.customerPhone) {
+                <div class="muted">{{ g.customerPhone }}</div>
+              }
+            </div>
+            <strong class="mono">{{ g.totalOutstanding | currency: 'PKR' : 'symbol-narrow' : '1.0-2' }}</strong>
+          </div>
+          <div class="table-wrap">
+            <table class="table nested">
+              <thead>
+                <tr>
+                  <th>Invoice</th>
+                  <th>Date</th>
+                  <th class="num">Total</th>
+                  <th class="num">Remaining</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (r of g.receipts; track r.id) {
+                  <tr>
+                    <td class="mono">{{ r.invoiceNumber }}</td>
+                    <td class="muted">{{ r.createdAt ? (r.createdAt | date: 'mediumDate') : '—' }}</td>
+                    <td class="num mono">{{ r.totals.grandTotal | currency: 'PKR' : 'symbol-narrow' : '1.0-2' }}</td>
+                    <td class="num mono outstanding">{{ r.totals.remainingAmount | currency: 'PKR' : 'symbol-narrow' : '1.0-2' }}</td>
+                    <td class="actions">
+                      <p-button type="button" label="Receive" size="small" icon="pi pi-wallet" (onClick)="openPayment(r)" />
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        </div>
+      }
+    }
+  </p-card>
+</div>
