@@ -388,11 +388,11 @@
               <div class="col-stat col-base-stock">
                 <span class="col-label">Base stock</span>
                 @if (p.type === 'count') {
-                  <span class="col-value"><strong>{{ p.stockInBaseUnit | number: '1.0-0' }} pc</strong></span>
-                  <span class="col-sub muted">{{ stockInCartons(p) | number: '1.0-2' }} {{ p.sellingUnit }}</span>
+                  <span class="col-value"><strong>{{ stockInCartons(p) | number: '1.0-2' }} {{ p.sellingUnit }}</strong></span>
+                  <span class="col-sub muted">{{ p.stockInBaseUnit | number: '1.0-0' }} pc</span>
                 } @else {
-                  <span class="col-value"><strong>{{ p.stockInBaseUnit | number: '1.0-2' }} {{ p.baseUnit }}</strong></span>
-                  <span class="col-sub muted">{{ stockInSellingUnit(p) | number: '1.2-4' }} {{ p.sellingUnit }}</span>
+                  <span class="col-value"><strong>{{ stockInSellingUnit(p) | number: '1.2-4' }} {{ p.sellingUnit }}</strong></span>
+                  <span class="col-sub muted">{{ p.stockInBaseUnit | number: '1.0-2' }} {{ p.baseUnit }}</span>
                 }
               </div>
 
