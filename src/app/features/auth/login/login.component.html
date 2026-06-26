@@ -10,11 +10,7 @@
       [attr.aria-label]="theme.isDark() ? 'Switch to light mode' : 'Switch to dark mode'"
     />
   </div>
-  <p-card
-    [header]="isSignUp() ? 'Create account' : 'Sign in'"
-    subheader="Shop management"
-    styleClass="login-card"
-  >
+  <p-card header="Sign in" subheader="Shop management" styleClass="login-card">
     <form class="login-form" [formGroup]="form" (ngSubmit)="submit()">
       <p-floatlabel>
         <input
@@ -41,7 +37,7 @@
           id="login-password"
           type="password"
           formControlName="password"
-          [attr.autocomplete]="isSignUp() ? 'new-password' : 'current-password'"
+          autocomplete="current-password"
           [invalid]="form.controls.password.invalid && form.controls.password.touched"
         />
         <label for="login-password">Password</label>
@@ -59,7 +55,7 @@
 
       <p-button
         type="submit"
-        [label]="loading() ? 'Please wait…' : isSignUp() ? 'Create account' : 'Sign in'"
+        [label]="loading() ? 'Please wait…' : 'Sign in'"
         [loading]="loading()"
         [disabled]="loading()"
         fluid
@@ -67,14 +63,8 @@
       />
     </form>
 
-    <p class="switch">
-      @if (isSignUp()) {
-        Already have an account?
-        <button type="button" class="link" (click)="toggleMode()">Sign in</button>
-      } @else {
-        New here?
-        <button type="button" class="link" (click)="toggleMode()">Create an account</button>
-      }
+    <p class="switch muted">
+      Accounts are created by an admin in Firebase Console. Contact your shop admin if you need access.
     </p>
   </p-card>
 </div>

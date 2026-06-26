@@ -58,6 +58,7 @@ export class ShopHeaderComponent {
     if (url.includes('/suppliers')) return 'Suppliers';
     if (url.includes('/stock-history')) return 'Stock History';
     if (url.includes('/settings')) return 'Settings';
+    if (url.includes('/users')) return 'Users';
     return 'My Shop';
   }
 
@@ -74,6 +75,7 @@ export class ShopHeaderComponent {
     if (url.includes('/suppliers')) return 'Manage suppliers';
     if (url.includes('/stock-history')) return 'Inventory movement history';
     if (url.includes('/settings')) return 'Shop profile and defaults';
+    if (url.includes('/users')) return 'Manage staff roles and access';
     return '';
   }
 

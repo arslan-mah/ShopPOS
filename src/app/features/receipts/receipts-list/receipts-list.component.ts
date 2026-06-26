@@ -11,6 +11,7 @@ import QRCode from 'qrcode';
 import { BarcodeScanToolbarComponent } from '../../../shared/barcode/barcode-scan-toolbar.component';
 import { findReceiptByScanCode } from '../../../shared/barcode/barcode.util';
 import { AuthService } from '../../../core/auth/auth.service';
+import { PermissionsService } from '../../../core/auth/permissions.service';
 import { mapDataErrorMessage } from '../../../core/firebase/map-data-error-message';
 import { Product, ProductsService } from '../../products/products.service';
 import {
@@ -47,6 +48,7 @@ export class ReceiptsListComponent {
   private readonly receiptsService = inject(ReceiptsService);
   private readonly productsService = inject(ProductsService);
   private readonly auth = inject(AuthService);
+  private readonly permissions = inject(PermissionsService);
 
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
@@ -63,6 +65,7 @@ export class ReceiptsListComponent {
   readonly refunding = signal(false);
 
   readonly canRefundSelected = computed(() => {
+    if (!this.permissions.isAdmin()) return false;
     const r = this.selectedReceipt();
     if (!r || r.type === 'refund') return false;
     return hasRefundableQuantity(r, this.items());

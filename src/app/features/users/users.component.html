@@ -1,0 +1,126 @@
+<div class="page">
+  <div class="add-btn-row">
+    <p-button type="button" label="Add user profile" icon="pi pi-plus" (onClick)="openAdd()" />
+  </div>
+
+  <div class="info-banner">
+    <strong>How to add staff:</strong>
+    (1) Create the login in Firebase Console → Authentication → Add user.
+    (2) Copy that user’s <strong>User UID</strong>.
+    (3) Click <strong>Add user profile</strong> here and paste the UID with role and name.
+    For the first shop admin, set your own UID in Realtime Database → <code>users/YOUR_UID</code> with
+    <code>role: admin</code> and <code>active: true</code>.
+  </div>
+
+  @if (error() && !showFormModal) {
+    <p-message severity="error" [text]="error()!" [closable]="false" styleClass="msg-banner" />
+  }
+
+  <p-dialog
+    [header]="editingUser ? 'Edit user profile' : 'Add user profile'"
+    [(visible)]="showFormModal"
+    [modal]="true"
+    [closable]="true"
+    [dismissableMask]="true"
+    [style]="{ width: '40rem', maxWidth: '96vw' }"
+    [contentStyle]="{ padding: '0' }"
+    (onHide)="onFormClosed()"
+  >
+    <form class="form" [formGroup]="form" (ngSubmit)="saveUser()">
+      <div class="form-body">
+        <label class="field">
+          <span class="label">User UID <span class="req">*</span></span>
+          <input pInputText fluid class="input w-full mono" formControlName="uid" placeholder="From Firebase Authentication" />
+          @if (!editingUser) {
+            <span class="hint muted">Paste the UID from Firebase Console after creating the Auth user.</span>
+          }
+        </label>
+        <label class="field">
+          <span class="label">Email <span class="req">*</span></span>
+          <input pInputText fluid class="input w-full" type="email" formControlName="email" />
+        </label>
+        <label class="field">
+          <span class="label">Display name <span class="req">*</span></span>
+          <input pInputText fluid class="input w-full" formControlName="displayName" />
+        </label>
+        <label class="field">
+          <span class="label">Role <span class="req">*</span></span>
+          <select class="input select w-full" formControlName="role">
+            @for (r of roles; track r.value) {
+              <option [value]="r.value">{{ r.label }}</option>
+            }
+          </select>
+        </label>
+        <label class="field checkbox-field">
+          <input type="checkbox" formControlName="active" />
+          <span class="label">Active (can sign in)</span>
+        </label>
+      </div>
+      <div class="form-actions">
+        <p-button
+          type="submit"
+          [label]="saving() ? 'Saving…' : editingUser ? 'Update' : 'Add profile'"
+          [loading]="saving()"
+          [disabled]="saving()"
+        />
+        @if (!saving()) {
+          <p-button type="button" label="Cancel" styleClass="p-button-secondary" [outlined]="true" (onClick)="showFormModal = false" />
+        }
+      </div>
+    </form>
+    @if (error()) {
+      <p-message severity="error" [text]="error()!" [closable]="false" styleClass="msg-banner" />
+    }
+  </p-dialog>
+
+  <p-card styleClass="list-card">
+    <p-header>
+      <div class="list-header-inner">
+        <span class="list-title">Users</span>
+        <p-tag value="Admin only" severity="warn" />
+      </div>
+    </p-header>
+
+    @if (loading() && items().length === 0) {
+      <div class="state-empty"><p>Loading users…</p></div>
+    } @else if (items().length === 0) {
+      <div class="state-empty"><p>No user profiles yet. Add your first admin profile using the steps above.</p></div>
+    } @else {
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Email</th>
+              <th>Role</th>
+              <th>Status</th>
+              <th>UID</th>
+              <th>Created</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (u of items(); track u.id) {
+              <tr>
+                <td class="name-cell">{{ u.displayName || '—' }}</td>
+                <td>{{ u.email || '—' }}</td>
+                <td>
+                  <p-tag [value]="u.role" [severity]="roleSeverity(u.role)" />
+                </td>
+                <td>
+                  <p-tag [value]="u.active ? 'Active' : 'Inactive'" [severity]="u.active ? 'success' : 'danger'" />
+                </td>
+                <td class="mono muted uid-cell">{{ u.id }}</td>
+                <td class="muted">{{ u.createdAt ? (u.createdAt | date: 'mediumDate') : '—' }}</td>
+                <td class="actions">
+                  <p-button type="button" label="Edit" [outlined]="true" size="small" icon="pi pi-pencil" (onClick)="openEdit(u)" />
+                  <p-button type="button" label="Delete" severity="danger" [outlined]="true" size="small" icon="pi pi-trash" (onClick)="deleteUser(u)" />
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </p-card>
+</div>

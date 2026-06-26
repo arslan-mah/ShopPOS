@@ -1,0 +1,40 @@
+@import '../expenses/expenses.component.scss';
+
+.info-banner {
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  background: var(--p-content-background);
+  border: 1px solid var(--p-content-border-color);
+  font-size: 0.9rem;
+  line-height: 1.5;
+
+  code {
+    font-size: 0.85em;
+  }
+}
+
+.checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+
+  input {
+    width: 1rem;
+    height: 1rem;
+  }
+}
+
+.hint {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.85rem;
+}
+
+.uid-cell {
+  max-width: 10rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
