@@ -5,30 +5,30 @@
    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
 
    :host {
-     --c-bg: #f5f4f1;
-     --c-surface: #ffffff;
-     --c-surface-2: #faf9f7;
-     --c-border: #e8e5df;
-     --c-border-strong: #d4cfc5;
+     --c-bg: var(--app-main-bg);
+     --c-surface: var(--app-card-bg);
+     --c-surface-2: var(--app-table-row-alt);
+     --c-border: var(--app-border);
+     --c-border-strong: color-mix(in srgb, var(--app-border) 70%, var(--app-text));
    
-     --c-text: #1a1814;
-     --c-text-2: #6b6760;
-     --c-text-3: #a09c96;
+     --c-text: var(--app-text);
+     --c-text-2: var(--app-muted);
+     --c-text-3: var(--app-muted);
    
      --c-accent: #2d6a4f;
-     --c-accent-soft: #e8f4ec;
+     --c-accent-soft: var(--app-success-tint);
      --c-accent-hover: #245a42;
    
-     --c-danger: #c0392b;
-     --c-danger-soft: #fdf0ef;
+     --c-danger: #ef4444;
+     --c-danger-soft: var(--app-error-bg);
    
      --radius-sm: 6px;
      --radius: 10px;
      --radius-lg: 14px;
    
-     --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
-     --shadow: 0 4px 12px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.04);
-     --shadow-lg: 0 12px 32px rgba(0,0,0,0.10), 0 4px 12px rgba(0,0,0,0.06);
+     --shadow-sm: var(--app-card-shadow);
+     --shadow: var(--app-card-shadow);
+     --shadow-lg: var(--app-card-shadow);
    
      font-family: 'Outfit', sans-serif;
      color: var(--c-text);
@@ -39,8 +39,8 @@
      padding: 2rem 2.5rem;
      max-width: 1200px;
      margin: 0 auto;
-     background: var(--c-bg);
-     min-height: 100vh;
+     background: transparent;
+     min-height: auto;
    }
    
    /* ── Add button ── */
@@ -347,7 +347,7 @@
    code {
      font-family: 'JetBrains Mono', monospace;
      font-size: 0.8rem;
-     background: #f0ede8;
+     background: var(--c-preview);
      padding: 0.15em 0.4em;
      border-radius: 4px;
      color: var(--c-text-2);

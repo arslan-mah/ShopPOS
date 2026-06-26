@@ -1,5 +1,10 @@
 import { inject, Injectable } from '@angular/core';
 import {
+  endAt,
+  endBefore,
+  equalTo,
+  get,
+  limitToLast,
   onValue,
   orderByChild,
   push,
@@ -8,6 +13,7 @@ import {
   remove,
   serverTimestamp,
   set,
+  startAt,
 } from 'firebase/database';
 import { Observable } from 'rxjs';
 import { REALTIME_DATABASE } from '../../core/firebase/firebase.tokens';
@@ -157,23 +163,76 @@ export class ReceiptsService {
 
   watchReceipts(): Observable<Receipt[]> {
     const receiptsQuery = query(ref(this.db, 'receipts'), orderByChild('createdAt'));
+    return this.watchReceiptsQuery(receiptsQuery);
+  }
+
+  /** Live feed of the most recent N receipts (newest first). */
+  watchRecentReceipts(pageSize: number): Observable<Receipt[]> {
+    const receiptsQuery = query(
+      ref(this.db, 'receipts'),
+      orderByChild('createdAt'),
+      limitToLast(pageSize),
+    );
+    return this.watchReceiptsQuery(receiptsQuery);
+  }
+
+  /** Receipts whose createdAt falls within [startMs, endMs]. */
+  watchReceiptsInRange(startMs: number, endMs: number): Observable<Receipt[]> {
+    const receiptsQuery = query(
+      ref(this.db, 'receipts'),
+      orderByChild('createdAt'),
+      startAt(startMs),
+      endAt(endMs),
+    );
+    return this.watchReceiptsQuery(receiptsQuery);
+  }
+
+  /** Fetch older receipts before a timestamp (one-time, for pagination). */
+  async loadOlderReceipts(beforeMs: number, pageSize: number): Promise<Receipt[]> {
+    const receiptsQuery = query(
+      ref(this.db, 'receipts'),
+      orderByChild('createdAt'),
+      endBefore(beforeMs),
+      limitToLast(pageSize),
+    );
+    const snap = await get(receiptsQuery);
+    return this.mapReceiptsSnapshot(snap.val());
+  }
+
+  async getReceiptById(id: string): Promise<Receipt | null> {
+    const snap = await get(ref(this.db, `receipts/${id}`));
+    if (!snap.exists()) return null;
+    return mapReceiptRecord(id, snap.val() as Record<string, unknown>);
+  }
+
+  async getRefundsForOriginal(originalReceiptId: string): Promise<Receipt[]> {
+    const q = query(
+      ref(this.db, 'receipts'),
+      orderByChild('originalReceiptId'),
+      equalTo(originalReceiptId),
+    );
+    const snap = await get(q);
+    return this.mapReceiptsSnapshot(snap.val());
+  }
+
+  private watchReceiptsQuery(receiptsQuery: ReturnType<typeof query>): Observable<Receipt[]> {
     return new Observable((subscriber) => {
       const unsub = onValue(
         receiptsQuery,
         (snapshot) => {
-          const val = snapshot.val() as Record<string, Record<string, unknown>> | null;
-          if (!val) {
-            subscriber.next([]);
-            return;
-          }
-          const rows: Receipt[] = Object.entries(val).map(([id, data]) => mapReceiptRecord(id, data));
-          rows.sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
-          subscriber.next(rows);
+          subscriber.next(this.mapReceiptsSnapshot(snapshot.val()));
         },
         (err) => subscriber.error(err),
       );
       return () => unsub();
     });
+  }
+
+  private mapReceiptsSnapshot(val: Record<string, Record<string, unknown>> | null): Receipt[] {
+    if (!val) return [];
+    const rows: Receipt[] = Object.entries(val).map(([id, data]) => mapReceiptRecord(id, data));
+    rows.sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
+    return rows;
   }
 
   async addReceipt(draft: ReceiptDraft): Promise<string> {

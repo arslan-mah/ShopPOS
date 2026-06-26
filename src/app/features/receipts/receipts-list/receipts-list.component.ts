@@ -26,6 +26,8 @@ import {
 } from '../receipts.service';
 import { computeReceiptProfitTotals } from '../receipt-math';
 
+const PAGE_SIZE = 50;
+
 @Component({
   selector: 'app-receipts-list',
   standalone: true,
@@ -50,11 +52,16 @@ export class ReceiptsListComponent {
   private readonly auth = inject(AuthService);
   private readonly permissions = inject(PermissionsService);
 
+  readonly pageSize = PAGE_SIZE;
   readonly loading = signal(true);
+  readonly loadingMore = signal(false);
+  readonly hasMore = signal(true);
   readonly error = signal<string | null>(null);
   readonly items = signal<Receipt[]>([]);
   readonly products = signal<Product[]>([]);
   readonly filter = signal('');
+  /** Refund receipts loaded for the receipt being refunded. */
+  private readonly refundContextReceipts = signal<Receipt[]>([]);
 
   readonly showDetailModal = signal(false);
   readonly selectedReceipt = signal<Receipt | null>(null);
@@ -68,12 +75,28 @@ export class ReceiptsListComponent {
     if (!this.permissions.isAdmin()) return false;
     const r = this.selectedReceipt();
     if (!r || r.type === 'refund') return false;
-    return hasRefundableQuantity(r, this.items());
+    return hasRefundableQuantity(r, this.refundContextReceipts());
   });
 
   readonly receiptScanEnabled = computed(
     () => !this.showDetailModal() && !this.showRefundModal() && !this.refunding(),
   );
+
+  readonly filteredItems = computed(() => {
+    const q = this.filter().trim().toLowerCase();
+    const rows = this.items();
+    if (!q) return rows;
+    return rows.filter((r) => {
+      const cust = this.displayCustomer(r.customer).toLowerCase();
+      const addr = (r.customer.address || '').toLowerCase();
+      return (
+        r.invoiceNumber.toLowerCase().includes(q) ||
+        cust.includes(q) ||
+        addr.includes(q) ||
+        (r.originalInvoiceNumber || '').toLowerCase().includes(q)
+      );
+    });
+  });
 
   constructor() {
     void this.subscribeWhenAuthReady();
@@ -98,11 +121,12 @@ export class ReceiptsListComponent {
     }
 
     this.receiptsService
-      .watchReceipts()
+      .watchRecentReceipts(PAGE_SIZE)
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: (rows) => {
           this.items.set(rows);
+          this.hasMore.set(rows.length >= PAGE_SIZE);
           this.loading.set(false);
         },
         error: (err: unknown) => {
@@ -120,6 +144,35 @@ export class ReceiptsListComponent {
       });
   }
 
+  async loadMore(): Promise<void> {
+    if (this.loadingMore() || !this.hasMore()) return;
+    const rows = this.items();
+    const oldest = rows[rows.length - 1]?.createdAt;
+    if (!oldest) {
+      this.hasMore.set(false);
+      return;
+    }
+
+    this.loadingMore.set(true);
+    this.error.set(null);
+    try {
+      await this.auth.ensureSessionForDatabase();
+      const older = await this.receiptsService.loadOlderReceipts(oldest.getTime(), PAGE_SIZE);
+      const existingIds = new Set(rows.map((r) => r.id));
+      const merged = [...rows];
+      for (const r of older) {
+        if (!existingIds.has(r.id)) merged.push(r);
+      }
+      merged.sort((a, b) => (b.createdAt?.getTime() ?? 0) - (a.createdAt?.getTime() ?? 0));
+      this.items.set(merged);
+      this.hasMore.set(older.length >= PAGE_SIZE);
+    } catch (e: unknown) {
+      this.error.set(mapDataErrorMessage(e));
+    } finally {
+      this.loadingMore.set(false);
+    }
+  }
+
   private async generateQr(text: string): Promise<void> {
     try {
       const dataUrl = await QRCode.toDataURL(text, { errorCorrectionLevel: 'M', margin: 1, width: 200 });
@@ -134,21 +187,6 @@ export class ReceiptsListComponent {
     return c.fullName || 'Guest';
   }
 
-  filteredItems(): Receipt[] {
-    const q = this.filter().trim().toLowerCase();
-    if (!q) return this.items();
-    return this.items().filter((r) => {
-      const cust = this.displayCustomer(r.customer).toLowerCase();
-      const addr = (r.customer.address || '').toLowerCase();
-      return (
-        r.invoiceNumber.toLowerCase().includes(q) ||
-        cust.includes(q) ||
-        addr.includes(q) ||
-        (r.originalInvoiceNumber || '').toLowerCase().includes(q)
-      );
-    });
-  }
-
   receiptTypeLabel(r: Receipt): string {
     return r.type === 'refund' ? 'Refund' : 'Sale';
   }
@@ -161,7 +199,7 @@ export class ReceiptsListComponent {
   onReceiptBarcodeScanned(code: string): void {
     const receipt = findReceiptByScanCode(this.items(), code);
     if (!receipt) {
-      this.error.set(`No receipt found for "${code}".`);
+      this.error.set(`No receipt found in loaded list for "${code}". Load more if it is older.`);
       return;
     }
     this.error.set(null);
@@ -171,17 +209,26 @@ export class ReceiptsListComponent {
   closeDetail(): void {
     this.showDetailModal.set(false);
     this.selectedReceipt.set(null);
+    this.refundContextReceipts.set([]);
   }
 
   printDetail(): void {
     window.print();
   }
 
-  openOriginalReceipt(originalId: string | undefined): void {
+  async openOriginalReceipt(originalId: string | undefined): Promise<void> {
     if (!originalId) return;
-    const original = this.items().find((r) => r.id === originalId);
-    if (original) {
-      this.openReceipt(original);
+    const local = this.items().find((r) => r.id === originalId);
+    if (local) {
+      this.openReceipt(local);
+      return;
+    }
+    try {
+      await this.auth.ensureSessionForDatabase();
+      const fetched = await this.receiptsService.getReceiptById(originalId);
+      if (fetched) this.openReceipt(fetched);
+    } catch (e: unknown) {
+      this.error.set(mapDataErrorMessage(e));
     }
   }
 
@@ -189,12 +236,19 @@ export class ReceiptsListComponent {
     return receiptLineTotal(l);
   }
 
-  openRefundModal(): void {
+  async openRefundModal(): Promise<void> {
     const r = this.selectedReceipt();
     if (!r || r.type === 'refund') return;
     this.error.set(null);
-    this.refundLines.set(buildRefundableLines(r, this.items()));
-    this.showRefundModal.set(true);
+    try {
+      await this.auth.ensureSessionForDatabase();
+      const refunds = await this.receiptsService.getRefundsForOriginal(r.id);
+      this.refundContextReceipts.set(refunds);
+      this.refundLines.set(buildRefundableLines(r, refunds));
+      this.showRefundModal.set(true);
+    } catch (e: unknown) {
+      this.error.set(mapDataErrorMessage(e));
+    }
   }
 
   closeRefundModal(): void {
@@ -317,8 +371,8 @@ export class ReceiptsListComponent {
       if (created) {
         this.openReceipt(created);
       } else {
-        const refreshed = this.items().find((r) => r.id === original.id);
-        if (refreshed) this.selectedReceipt.set(refreshed);
+        const fetched = await this.receiptsService.getReceiptById(refundId);
+        if (fetched) this.openReceipt(fetched);
       }
     } catch (err: unknown) {
       this.error.set(mapDataErrorMessage(err));

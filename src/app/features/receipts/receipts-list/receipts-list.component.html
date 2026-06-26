@@ -1,5 +1,5 @@
 <div class="page">
-  <p-card header="Receipts" subheader="All invoices — click a row to view details" styleClass="list-card">
+  <p-card header="Receipts" subheader="Recent invoices — click a row to view details" styleClass="list-card receipts-card">
     <div class="list-actions">
       <label class="filter">
         <span class="filter-label">Search</span>
@@ -27,8 +27,12 @@
       <div class="state-empty">Loading receipts…</div>
     } @else if (filteredItems().length === 0) {
       <div class="state-empty">
-        No receipts yet.<br />
-        Create sales from <strong>Point of Sale</strong> on the Home page.
+        @if (filter()) {
+          No receipts match your search.
+        } @else {
+          No receipts yet.<br />
+          Create sales from <strong>Point of Sale</strong> on the Home page.
+        }
       </div>
     } @else {
       <div class="table-wrap">
@@ -70,6 +74,28 @@
           </tbody>
         </table>
       </div>
+
+      @if (!filter()) {
+        <div class="list-footer">
+          <span class="footer-meta muted">
+            Showing {{ items().length }} receipt{{ items().length === 1 ? '' : 's' }}
+          </span>
+          @if (hasMore()) {
+            <p-button
+              type="button"
+              [label]="loadingMore() ? 'Loading…' : 'Load older receipts'"
+              [loading]="loadingMore()"
+              [disabled]="loadingMore()"
+              severity="secondary"
+              [outlined]="true"
+              size="small"
+              (onClick)="loadMore()"
+            />
+          } @else if (items().length >= pageSize) {
+            <span class="footer-meta muted">End of list</span>
+          }
+        </div>
+      }
     }
   </p-card>
 </div>

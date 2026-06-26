@@ -15,10 +15,11 @@ import {
   ProductDraft,
   ProductUnitType,
   ProductsService,
+  productInventoryValue,
   StockInputMode,
   stockQuantityToBase,
 } from './products.service';
-import { StockMovementsService } from '../stock/stock-movements.service';
+import { findProductByBarcode } from '../../shared/barcode/barcode.util';
 import {
   isProductExpired,
   isProductExpiringSoon,
@@ -26,13 +27,12 @@ import {
   productExpiryTagSeverity,
 } from './product-expiry.util';
 import { BarcodeScanToolbarComponent } from '../../shared/barcode/barcode-scan-toolbar.component';
-import { findProductByBarcode } from '../../shared/barcode/barcode.util';
 
 /** Count products: price entered per piece or per carton. */
 export type CountPriceMode = 'piece' | 'carton';
 
-/** Adjust panel: weight/volume use base/selling; count uses cartons or pieces. */
-export type AdjustStockMode = StockInputMode | 'carton';
+/** Low-stock threshold input: weight/volume use base/selling; count uses cartons or pieces. */
+type LowStockInputMode = StockInputMode | 'carton';
 
 @Component({
   selector: 'app-products',
@@ -55,16 +55,24 @@ export class ProductsComponent implements OnInit {
   private readonly auth = inject(AuthService);
   private readonly fb = inject(FormBuilder);
   private readonly productsService = inject(ProductsService);
-  private readonly stockMovements = inject(StockMovementsService);
   /** Tracks previous low-stock unit for converting quantity when the unit changes. */
-  private lastLowStockMode: AdjustStockMode = 'base';
+  private lastLowStockMode: LowStockInputMode = 'base';
 
   readonly items = signal<Product[]>([]);
+  readonly searchQuery = signal('');
+  readonly filteredItems = computed(() => {
+    const q = this.searchQuery().trim().toLowerCase();
+    const rows = this.items();
+    if (!q) return rows;
+    return rows.filter(
+      (p) =>
+        p.name.toLowerCase().includes(q) ||
+        (p.barcode?.toLowerCase().includes(q) ?? false),
+    );
+  });
   readonly loading = signal(true);
   readonly saving = signal(false);
-  readonly savingAdjustId = signal<string | null>(null);
   readonly error = signal<string | null>(null);
-  readonly adjustingId = signal<string | null>(null);
 
   /** Single modal for add + edit */
   showProductModal = false;
@@ -98,15 +106,10 @@ export class ProductsComponent implements OnInit {
     stockInputMode: this.fb.nonNullable.control<StockInputMode>('base'),
     stockQuantity: [0, [Validators.required, Validators.min(0)]],
     /** Unit for low-stock threshold input; value is converted to base units for storage. */
-    lowStockInputMode: this.fb.nonNullable.control<AdjustStockMode>('base'),
+    lowStockInputMode: this.fb.nonNullable.control<LowStockInputMode>('base'),
     lowStockQuantity: [0, [Validators.required, Validators.min(0)]],
     hasExpiry: [false],
     expiryDate: [''],
-  });
-
-  readonly adjustForm = this.fb.nonNullable.group({
-    stockInputMode: this.fb.nonNullable.control<AdjustStockMode>('base'),
-    stockQuantity: [0, [Validators.required, Validators.min(0)]],
   });
 
   ngOnInit(): void {
@@ -220,7 +223,7 @@ export class ProductsComponent implements OnInit {
   }
 
   /** Low-stock threshold unit options (same basis as stock conversion). */
-  lowStockModeOptionsForForm(): { value: AdjustStockMode; label: string }[] {
+  lowStockModeOptionsForForm(): { value: LowStockInputMode; label: string }[] {
     const v = this.form.getRawValue();
     if (v.type === 'count') {
       const ppc = Math.max(1, v.piecesPerCarton || 1);
@@ -269,50 +272,6 @@ export class ProductsComponent implements OnInit {
     return this.previewLowStockInBase() / ppc;
   }
 
-  stockModeOptionsForProduct(p: Product): { value: AdjustStockMode; label: string }[] {
-    if (p.type === 'count') {
-      const ppc = p.piecesPerCarton || 1;
-      return [
-        { value: 'carton', label: `Cartons (${ppc} pc each)` },
-        { value: 'base', label: 'Total pieces' },
-      ];
-    }
-    return [
-      { value: 'base', label: `Base (${p.baseUnit})` },
-      { value: 'selling', label: `Selling (${p.sellingUnit})` },
-    ];
-  }
-
-  previewAdjustStock(p: Product): number {
-    const v = this.adjustForm.getRawValue();
-    return stockQuantityToBase({
-      type: p.type,
-      conversionFactor: p.conversionFactor,
-      piecesPerCarton: p.piecesPerCarton,
-      mode: v.stockInputMode,
-      quantity: v.stockQuantity,
-    });
-  }
-
-  /** Adjust preview: stock in selling unit (kg, L, …). */
-  previewAdjustStockSelling(p: Product): number {
-    if (p.type !== 'weight' && p.type !== 'volume') {
-      return 0;
-    }
-    const base = this.previewAdjustStock(p);
-    const cf = p.conversionFactor > 0 ? p.conversionFactor : 1;
-    return base / cf;
-  }
-
-  /** Adjust preview: stock in cartons (count). */
-  previewAdjustStockCartons(p: Product): number {
-    if (p.type !== 'count') {
-      return 0;
-    }
-    const ppc = Math.max(1, p.piecesPerCarton);
-    return this.previewAdjustStock(p) / ppc;
-  }
-
   /** Table: stock in selling unit from stored base units. */
   stockInSellingUnit(p: Product): number {
     if (p.type !== 'weight' && p.type !== 'volume') {
@@ -329,6 +288,10 @@ export class ProductsComponent implements OnInit {
     }
     const ppc = Math.max(1, p.piecesPerCarton);
     return p.stockInBaseUnit / ppc;
+  }
+
+  inventoryValue(p: Product): number {
+    return productInventoryValue(p);
   }
 
   /** Table: low-stock alert threshold in selling unit (kg, L, …). */
@@ -394,90 +357,6 @@ export class ProductsComponent implements OnInit {
         { emitEvent: false },
       );
       this.lastLowStockMode = 'base';
-    }
-  }
-
-  openAdjustStock(p: Product): void {
-    this.adjustingId.set(p.id);
-    if (p.type === 'count') {
-      this.adjustForm.setValue({
-        stockInputMode: 'carton',
-        stockQuantity: baseStockToDisplayQuantity(
-          p.stockInBaseUnit,
-          p.type,
-          p.conversionFactor,
-          p.piecesPerCarton,
-          'carton',
-        ),
-      });
-    } else {
-      this.adjustForm.setValue({
-        stockInputMode: 'base',
-        stockQuantity: baseStockToDisplayQuantity(
-          p.stockInBaseUnit,
-          p.type,
-          p.conversionFactor,
-          p.piecesPerCarton,
-          'base',
-        ),
-      });
-    }
-  }
-
-  onAdjustModeChanged(p: Product): void {
-    const mode = this.adjustForm.getRawValue().stockInputMode;
-    this.adjustForm.patchValue(
-      {
-        stockQuantity: baseStockToDisplayQuantity(
-          p.stockInBaseUnit,
-          p.type,
-          p.conversionFactor,
-          p.piecesPerCarton,
-          mode,
-        ),
-      },
-      { emitEvent: false },
-    );
-  }
-
-  cancelAdjustStock(): void {
-    this.adjustingId.set(null);
-  }
-
-  async saveAdjustStock(p: Product): Promise<void> {
-    if (this.adjustForm.invalid) {
-      this.adjustForm.markAllAsTouched();
-      return;
-    }
-    const { stockInputMode, stockQuantity } = this.adjustForm.getRawValue();
-    const stockInBaseUnit = stockQuantityToBase({
-      type: p.type,
-      conversionFactor: p.conversionFactor,
-      piecesPerCarton: p.piecesPerCarton,
-      mode: stockInputMode,
-      quantity: stockQuantity,
-    });
-
-    this.savingAdjustId.set(p.id);
-    this.error.set(null);
-    try {
-      await this.auth.ensureSessionForDatabase();
-      const prev = p.stockInBaseUnit;
-      await this.productsService.updateStock(p.id, stockInBaseUnit);
-      const delta = Math.abs(stockInBaseUnit - prev);
-      if (delta > 0) {
-        await this.stockMovements.logMovement({
-          productId: p.id,
-          productName: p.name,
-          type: 'adjustment',
-          quantityInBaseUnit: delta,
-        });
-      }
-      this.adjustingId.set(null);
-    } catch (err: unknown) {
-      this.error.set(mapDataErrorMessage(err));
-    } finally {
-      this.savingAdjustId.set(null);
     }
   }
 
@@ -693,7 +572,7 @@ export class ProductsComponent implements OnInit {
     this.editingProduct.set(null);
   }
 
-  private lowStockModeForProduct(p: Product): AdjustStockMode {
+  private lowStockModeForProduct(p: Product): LowStockInputMode {
     if (p.type === 'count') {
       const ppc = Math.max(1, p.piecesPerCarton);
       const asCartons = p.lowStockThreshold / ppc;
@@ -789,6 +668,43 @@ export class ProductsComponent implements OnInit {
     const perPc = p.pricePerPiece;
     const perCarton = perPc * ppc;
     return `${perPc.toFixed(2)} / pc · ${perCarton.toFixed(2)} / carton`;
+  }
+
+  baseUnitBadge(p: Product): string {
+    return p.type === 'count' ? 'PIECES' : p.baseUnit.toUpperCase();
+  }
+
+  sellingUnitBadge(p: Product): string {
+    return p.sellingUnit.toUpperCase();
+  }
+
+  priceMainValue(p: Product): string {
+    if (p.type === 'count') {
+      const ppc = Math.max(1, p.piecesPerCarton);
+      return (p.pricePerPiece * ppc).toFixed(2);
+    }
+    return p.pricePerUnit.toFixed(2);
+  }
+
+  priceMainUnit(p: Product): string {
+    return p.sellingUnit;
+  }
+
+  priceSubLine(p: Product): string | null {
+    if (p.type === 'count') {
+      return `${p.pricePerPiece.toFixed(2)} / pc`;
+    }
+    return null;
+  }
+
+  costValue(p: Product): string {
+    if (p.cost <= 0) return '—';
+    return p.cost.toFixed(2);
+  }
+
+  costUnit(p: Product): string {
+    if (p.cost <= 0) return '';
+    return p.type === 'count' ? 'pc' : p.sellingUnit;
   }
 
 }

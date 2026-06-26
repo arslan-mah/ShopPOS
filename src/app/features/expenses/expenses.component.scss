@@ -1,23 +1,33 @@
 :host {
-  --c-bg: #f5f4f1;
-  --c-surface: #fff;
-  --c-surface-2: #faf9f7;
-  --c-border: #e8e5df;
-  --c-text: #1a1814;
-  --c-text-2: #6b6760;
+  --c-bg: var(--app-main-bg);
+  --c-surface: var(--app-card-bg);
+  --c-surface-2: var(--app-table-row-alt);
+  --c-border: var(--app-border);
+  --c-text: var(--app-text);
+  --c-text-2: var(--app-muted);
+  --c-text-3: var(--app-muted);
   --c-accent: #2d6a4f;
-  --c-danger: #c0392b;
+  --c-accent-soft: var(--app-success-tint);
+  --c-accent-hover: #245a42;
+  --c-danger: #ef4444;
+  --c-danger-soft: var(--app-error-bg);
+  --c-warning: #f59e0b;
+  --c-warning-soft: var(--app-pill-warn-bg);
+  --c-warning-row: var(--app-row-warn-bg);
+  --c-warning-row-border: color-mix(in srgb, #f59e0b 35%, var(--app-border));
+  --c-preview: var(--app-table-row-alt);
+  --c-card-inner: var(--app-table-row-alt);
   --radius: 10px;
-  font-family: 'Outfit', sans-serif;
+  font-family: Roboto, system-ui, sans-serif;
   color: var(--c-text);
 }
 
 .page {
-  padding: 2rem 2.5rem;
+  padding: 0;
   max-width: 1200px;
   margin: 0 auto;
-  background: var(--c-bg);
-  min-height: 100vh;
+  background: transparent;
+  min-height: auto;
 }
 
 .toolbar {
@@ -40,19 +50,22 @@
 
 .input {
   padding: 0.55rem 0.75rem;
-  border: 1.5px solid var(--c-border);
+  border: 1px solid var(--c-border);
   border-radius: 6px;
   font: inherit;
   background: var(--c-surface);
+  color: var(--c-text);
 }
 
 .select { cursor: pointer; }
 .w-full { width: 100%; box-sizing: border-box; }
 
 ::ng-deep .list-card.p-card {
+  background: var(--c-surface);
   border: 1px solid var(--c-border);
   border-radius: var(--radius);
   overflow: hidden;
+  box-shadow: var(--app-card-shadow);
   .p-card-header, .p-card-body, .p-card-content { padding: 0; }
 }
 
@@ -62,10 +75,11 @@
   justify-content: space-between;
   padding: 1rem 1.5rem;
   border-bottom: 1px solid var(--c-border);
+  background: var(--c-surface);
 }
 
 .header-meta { display: flex; align-items: center; gap: 0.75rem; }
-.list-title { font-weight: 600; }
+.list-title { font-weight: 600; color: var(--c-text); }
 
 .form-body { padding: 1.25rem; display: flex; flex-direction: column; gap: 1rem; }
 .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
@@ -80,20 +94,65 @@
   background: var(--c-surface-2);
 }
 
-.table-wrap { overflow-x: auto; }
+.table-wrap { overflow-x: auto; border-radius: 0.5rem; border: 1px solid var(--c-border); }
 .table {
   width: 100%;
   border-collapse: collapse;
   font-size: 0.875rem;
-  th, td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid var(--c-border); }
-  th { background: var(--c-surface-2); font-size: 0.72rem; text-transform: uppercase; color: var(--c-text-2); }
-  tbody tr:hover { background: var(--c-surface-2); }
+  th, td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid var(--c-border); color: var(--c-text); }
+  th { background: var(--app-table-header-bg); font-size: 0.72rem; text-transform: uppercase; color: var(--c-text-2); }
+  tbody tr:hover td { background: var(--c-surface-2); }
   .num { text-align: right; }
   .actions { text-align: right; white-space: nowrap; display: flex; gap: 0.35rem; justify-content: flex-end; }
 }
 
-.name-cell { font-weight: 600; }
+.name-cell { font-weight: 600; color: var(--c-text); }
 .sub { font-size: 0.78rem; font-weight: 400; margin-top: 0.15rem; }
 .muted { color: var(--c-text-2); font-size: 0.82rem; }
-.mono { font-family: 'JetBrains Mono', monospace; font-size: 0.82rem; }
-.state-empty { padding: 3rem; text-align: center; color: var(--c-text-2); }
+.mono { font-family: ui-monospace, monospace; font-size: 0.82rem; }
+.state-empty {
+  padding: 3rem;
+  text-align: center;
+  color: var(--c-text-2);
+  background: var(--c-surface-2);
+  border: 1px dashed var(--c-border);
+  border-radius: var(--radius);
+  margin: 1rem;
+}
+
+.add-btn-row { margin-bottom: 1rem; }
+
+.form {
+  .form-body { padding: 1.25rem; }
+  .form-actions { padding: 1rem 1.25rem; }
+}
+
+.info-banner {
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  background: var(--c-surface);
+  border: 1px solid var(--c-border);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--c-text);
+}
+
+.checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.uid-cell {
+  max-width: 10rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hint {
+  display: block;
+  margin-top: 0.25rem;
+  font-size: 0.85rem;
+}

@@ -77,7 +77,7 @@
                 <span class="label">Cartons in stock <span class="req">*</span></span>
                 <input class="input" type="number" formControlName="cartonsInStock" min="0" step="1" placeholder="0" [readonly]="isEditMode()" />
                 @if (isEditMode()) {
-                  <span class="hint">Use <strong>Adjust stock</strong> on the product row to change stock.</span>
+                  <span class="hint">Edit this product to change stock quantity.</span>
                 }
               </label>
             </div>
@@ -210,7 +210,7 @@
                     {{ ep.stockInBaseUnit | number: '1.0-2' }} {{ ep.baseUnit }} · {{ stockInSellingUnit(ep) | number: '1.2-4' }} {{ ep.sellingUnit }}
                   }
                 </strong>
-                <span class="hint">Use <strong>Adjust stock</strong> on the product row to change quantity.</span>
+                <span class="hint">Edit this product to change stock quantity.</span>
               </div>
             } @else {
               <div class="form-grid-3">
@@ -284,9 +284,24 @@
   <!-- ── Products Card ── -->
   <p-card styleClass="list-card">
     <p-header>
-      <div class="list-header-inner">
-        <span class="list-title">Products</span>
-        <p-tag value="Live" severity="success" />
+      <div class="list-header-inner list-header-rich">
+        <div class="list-header-text">
+          <span class="list-title">Products</span>
+          <span class="list-subtitle">Manage your product inventory and pricing</span>
+        </div>
+        <div class="list-header-tools">
+          <span class="search-wrap">
+            <i class="pi pi-search search-icon" aria-hidden="true"></i>
+            <input
+              class="search-input"
+              type="search"
+              placeholder="Search products…"
+              [value]="searchQuery()"
+              (input)="searchQuery.set($any($event.target).value)"
+            />
+          </span>
+          <p-tag value="Live" severity="success" />
+        </div>
       </div>
     </p-header>
 
@@ -301,18 +316,23 @@
         <p>No products yet.<br />Click <strong>Add New Product</strong> above to get started.</p>
         <p style="margin-top: 0.5rem; font-size: 0.78rem;">Data is stored under <code>/products</code>.</p>
       </div>
+    } @else if (filteredItems().length === 0) {
+      <div class="state-empty">
+        <div class="state-empty-icon">🔍</div>
+        <p>No products match your search.</p>
+      </div>
     } @else {
       <div class="product-list">
-        @for (p of items(); track p.id) {
+        @for (p of filteredItems(); track p.id) {
           <article
             class="product-row"
             [class.row-warning]="isLowStock(p) && !isExpired(p)"
             [class.row-expired]="isExpired(p)"
           >
             <div class="product-row-main">
-              <div class="product-row-leading">
+              <div class="col-identity">
                 <div class="product-avatar" [class.expired]="isExpired(p)">{{ p.name.charAt(0).toUpperCase() }}</div>
-                <div class="product-row-body">
+                <div class="identity-text">
                   <div class="product-row-title">
                     <span class="name-cell">{{ p.name }}</span>
                     @if (isLowStock(p) && !isExpired(p)) {
@@ -323,40 +343,60 @@
                     }
                   </div>
                   <div class="product-row-meta muted">{{ formatUnits(p) }}</div>
-                  <div class="product-row-chips">
-                    <span class="chip">
-                      <span class="chip-label">Price</span>
-                      @if (p.type === 'count') {
-                        {{ priceLineCount(p) }}
-                      } @else {
-                        {{ p.pricePerUnit | number: '1.2-2' }} / {{ p.sellingUnit }}
-                      }
-                    </span>
-                    <span class="chip">
-                      <span class="chip-label">Cost</span>
-                      {{ costLine(p) }}
-                    </span>
-                    <span class="chip">
-                      <span class="chip-label">Stock</span>
-                      @if (p.type === 'count') {
-                        {{ p.stockInBaseUnit | number: '1.0-0' }} pc · {{ stockInCartons(p) | number: '1.0-2' }} {{ p.sellingUnit }}
-                      } @else {
-                        {{ p.stockInBaseUnit | number: '1.0-2' }} {{ p.baseUnit }} · {{ stockInSellingUnit(p) | number: '1.2-4' }} {{ p.sellingUnit }}
-                      }
-                    </span>
-                  </div>
                 </div>
               </div>
 
+              <div class="col-stat">
+                <span class="col-label">Price</span>
+                @if (p.type === 'count') {
+                  <span class="col-value"><strong>{{ priceMainValue(p) }}</strong> / {{ priceMainUnit(p) }}</span>
+                  @if (priceSubLine(p); as sub) {
+                    <span class="col-sub muted">{{ sub }}</span>
+                  }
+                } @else {
+                  <span class="col-value"><strong>{{ priceMainValue(p) }}</strong> / {{ priceMainUnit(p) }}</span>
+                }
+              </div>
+
+              <div class="col-stat">
+                <span class="col-label">Cost</span>
+                <span class="col-value">
+                  @if (costValue(p) === '—') {
+                    —
+                  } @else {
+                    <strong>{{ costValue(p) }}</strong> / {{ costUnit(p) }}
+                  }
+                </span>
+              </div>
+
+              <div class="col-units">
+                <div class="unit-stack">
+                  <span class="col-label">Base</span>
+                  <span class="unit-pill base">{{ baseUnitBadge(p) }}</span>
+                </div>
+                <div class="unit-stack">
+                  <span class="col-label">Selling</span>
+                  <span class="unit-pill selling">{{ sellingUnitBadge(p) }}</span>
+                </div>
+              </div>
+
+              <div class="col-stat col-stock-value">
+                <span class="col-label">Stock value</span>
+                <span class="stock-value-num">{{ inventoryValue(p) | number: '1.0-0' }}</span>
+              </div>
+
+              <div class="col-stat col-base-stock">
+                <span class="col-label">Base stock</span>
+                @if (p.type === 'count') {
+                  <span class="col-value"><strong>{{ p.stockInBaseUnit | number: '1.0-0' }} pc</strong></span>
+                  <span class="col-sub muted">{{ stockInCartons(p) | number: '1.0-2' }} {{ p.sellingUnit }}</span>
+                } @else {
+                  <span class="col-value"><strong>{{ p.stockInBaseUnit | number: '1.0-2' }} {{ p.baseUnit }}</strong></span>
+                  <span class="col-sub muted">{{ stockInSellingUnit(p) | number: '1.2-4' }} {{ p.sellingUnit }}</span>
+                }
+              </div>
+
               <div class="product-row-actions">
-                <p-button
-                  type="button"
-                  label="Adjust"
-                  [outlined]="true"
-                  size="small"
-                  icon="pi pi-sliders-h"
-                  (onClick)="openAdjustStock(p)"
-                />
                 <div class="row-menu-wrap">
                   <button
                     type="button"
@@ -379,54 +419,6 @@
                 </div>
               </div>
             </div>
-
-            @if (adjustingId() === p.id) {
-              <div class="adjust-panel" [formGroup]="adjustForm">
-                <span class="adjust-title">Set stock level</span>
-                <div class="adjust-fields">
-                  <label class="field inline">
-                    <span class="label">Count as</span>
-                    <select
-                      class="input select"
-                      formControlName="stockInputMode"
-                      (change)="onAdjustModeChanged(p)"
-                    >
-                      @for (opt of stockModeOptionsForProduct(p); track opt.value) {
-                        <option [value]="opt.value">{{ opt.label }}</option>
-                      }
-                    </select>
-                  </label>
-                  <label class="field inline">
-                    <span class="label">Quantity</span>
-                    <input class="input" type="number" formControlName="stockQuantity" min="0" step="any" />
-                  </label>
-                  <span class="adjust-preview">
-                    →&nbsp;
-                    @if (p.type === 'count') {
-                      <strong>{{ previewAdjustStock(p) | number: '1.0-0' }} pc</strong>
-                      <span class="muted"> · </span>
-                      <strong>{{ previewAdjustStockCartons(p) | number: '1.0-2' }} {{ p.sellingUnit }}</strong>
-                    } @else {
-                      <strong>{{ previewAdjustStock(p) | number: '1.0-2' }} {{ p.baseUnit }}</strong>
-                      <span class="muted"> · </span>
-                      <strong>{{ previewAdjustStockSelling(p) | number: '1.2-4' }} {{ p.sellingUnit }}</strong>
-                    }
-                  </span>
-                  <div class="adjust-actions">
-                    <p-button
-                      type="button"
-                      [label]="savingAdjustId() === p.id ? 'Saving…' : 'Save'"
-                      [loading]="savingAdjustId() === p.id"
-                      [disabled]="savingAdjustId() === p.id"
-                      icon="pi pi-check"
-                      size="small"
-                      (onClick)="saveAdjustStock(p)"
-                    />
-                    <p-button type="button" label="Cancel" [outlined]="true" size="small" (onClick)="cancelAdjustStock()" />
-                  </div>
-                </div>
-              </div>
-            }
           </article>
         }
       </div>

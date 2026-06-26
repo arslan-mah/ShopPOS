@@ -1,5 +1,6 @@
 import { inject, Injectable } from '@angular/core';
 import {
+  endAt,
   get,
   onValue,
   orderByChild,
@@ -9,6 +10,7 @@ import {
   runTransaction,
   serverTimestamp,
   set,
+  startAt,
 } from 'firebase/database';
 import { Observable } from 'rxjs';
 import { REALTIME_DATABASE } from '../../core/firebase/firebase.tokens';
@@ -28,6 +30,20 @@ export class PurchasePaymentsService {
 
   watchPurchasePayments(): Observable<PurchasePayment[]> {
     const q = query(ref(this.db, 'purchasePayments'), orderByChild('createdAt'));
+    return this.watchPaymentsQuery(q);
+  }
+
+  watchPurchasePaymentsInRange(startMs: number, endMs: number): Observable<PurchasePayment[]> {
+    const q = query(
+      ref(this.db, 'purchasePayments'),
+      orderByChild('createdAt'),
+      startAt(startMs),
+      endAt(endMs),
+    );
+    return this.watchPaymentsQuery(q);
+  }
+
+  private watchPaymentsQuery(q: ReturnType<typeof query>): Observable<PurchasePayment[]> {
     return new Observable((subscriber) => {
       const unsub = onValue(
         q,

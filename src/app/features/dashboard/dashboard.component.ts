@@ -1,19 +1,32 @@
 import { DatePipe } from '@angular/common';
-import { Component, DestroyRef, computed, inject, signal } from '@angular/core';
+import { Component, DestroyRef, computed, effect, inject, signal } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { RouterLink } from '@angular/router';
+import { Subscription } from 'rxjs';
 import { CardModule } from 'primeng/card';
 import { AuthService } from '../../core/auth/auth.service';
+import {
+  DateRange,
+  DateRangePreset,
+  eachDayInRange,
+  formatRangeLabel,
+  isDateInRange,
+  parseDateInputValue,
+  presetRange,
+  rangeToMs,
+  startOfDay,
+  toDateInputValue,
+} from '../../core/utils/date-range.util';
 import { mapDataErrorMessage } from '../../core/firebase/map-data-error-message';
 import { Customer, CustomersService } from '../customers/customers.service';
 import { Expense, ExpensesService } from '../expenses/expenses.service';
 import { Purchase, PurchasesService } from '../purchases/purchases.service';
 import { PurchasePayment, PurchasePaymentsService } from '../purchases/purchase-payments.service';
-import { Product, ProductsService } from '../products/products.service';
+import { Product, ProductsService, productInventoryValue } from '../products/products.service';
 import { Receipt, ReceiptCustomerRef, ReceiptsService } from '../receipts/receipts.service';
 import { computeReceiptProfitTotals } from '../receipts/receipt-math';
 
-type WeekDayPoint = {
+type DayPoint = {
   label: string;
   total: number;
 };
@@ -22,6 +35,16 @@ type ChartPoint = {
   x: number;
   y: number;
 };
+
+const RANGE_SHORTCUTS: { preset: DateRangePreset; label: string }[] = [
+  { preset: 'today', label: 'Today' },
+  { preset: 'yesterday', label: 'Yesterday' },
+  { preset: 'thisWeek', label: 'This week' },
+  { preset: 'lastWeek', label: 'Last week' },
+  { preset: 'thisMonth', label: 'This month' },
+  { preset: 'lastMonth', label: 'Last month' },
+  { preset: 'custom', label: 'Custom' },
+];
 
 @Component({
   selector: 'app-dashboard',
@@ -39,8 +62,15 @@ export class DashboardComponent {
   private readonly purchasesService = inject(PurchasesService);
   private readonly purchasePaymentsService = inject(PurchasePaymentsService);
 
+  readonly rangeShortcuts = RANGE_SHORTCUTS;
   readonly loading = signal(true);
   readonly error = signal<string | null>(null);
+  readonly authReady = signal(false);
+
+  readonly dateRange = signal<DateRange>(presetRange('today'));
+  readonly customFromInput = signal(toDateInputValue(new Date()));
+  readonly customToInput = signal(toDateInputValue(new Date()));
+
   readonly receipts = signal<Receipt[]>([]);
   readonly products = signal<Product[]>([]);
   readonly customers = signal<Customer[]>([]);
@@ -48,22 +78,43 @@ export class DashboardComponent {
   readonly purchases = signal<Purchase[]>([]);
   readonly purchasePayments = signal<PurchasePayment[]>([]);
 
-  readonly todaySales = computed(() => this.sumReceiptsForDay(new Date(), 'grandTotal'));
-  readonly monthlySales = computed(() => this.sumReceiptsForMonth(new Date(), 'grandTotal'));
-  readonly todayExpenses = computed(() => this.sumExpensesForDay(new Date()));
-  readonly monthlyExpenses = computed(() => this.sumExpensesForMonth(new Date()));
-  readonly monthlyGrossProfit = computed(() => this.sumProfitForMonth(new Date()));
-  readonly monthlyNetProfit = computed(() => this.monthlyGrossProfit() - this.monthlyExpenses());
-  readonly monthlyPurchasePaid = computed(() => this.sumSupplierPaymentsForMonth(new Date()));
+  private rangeSubs: Subscription[] = [];
+
+  readonly rangeLabel = computed(() => formatRangeLabel(this.dateRange()));
+
+  readonly periodSales = computed(() =>
+    this.receipts().reduce((sum, r) => sum + (r.totals.grandTotal ?? 0), 0),
+  );
+
+  readonly periodGrossProfit = computed(() => {
+    const products = this.products();
+    return this.receipts().reduce((sum, r) => sum + this.profitForReceipt(r, products), 0);
+  });
+
+  readonly periodExpenses = computed(() =>
+    this.expenses().reduce((sum, e) => sum + e.amount, 0),
+  );
+
+  readonly periodNetProfit = computed(() => this.periodGrossProfit() - this.periodExpenses());
+
+  readonly periodPurchasePaid = computed(() =>
+    this.purchasePayments().reduce((sum, p) => sum + p.amount, 0),
+  );
+
   readonly supplierCreditOutstanding = computed(() =>
     this.purchases().reduce((sum, p) => sum + Math.max(0, p.remainingAmount), 0),
   );
-  readonly revenueLast30Days = computed(() => this.sumReceiptsLastDays(30, 'grandTotal'));
-  readonly totalCustomers = computed(() => this.customers().length);
-  readonly newCustomersThisMonth = computed(() => {
-    const now = new Date();
-    return this.customers().filter((c) => c.createdAt && this.isSameMonth(c.createdAt, now)).length;
+
+  readonly totalInventoryValue = computed(() =>
+    this.products().reduce((sum, p) => sum + productInventoryValue(p), 0),
+  );
+
+  readonly newCustomersInPeriod = computed(() => {
+    const range = this.dateRange();
+    return this.customers().filter((c) => c.createdAt && isDateInRange(c.createdAt, range)).length;
   });
+
+  readonly totalCustomers = computed(() => this.customers().length);
 
   readonly topSellingProducts = computed(() => {
     const qtyByProduct = new Map<string, { name: string; qty: number; revenue: number }>();
@@ -85,27 +136,14 @@ export class DashboardComponent {
   readonly paymentBreakdown = computed(() => {
     const map = new Map<string, number>();
     for (const r of this.receipts()) {
-      if (!r.createdAt || !this.isSameMonth(r.createdAt, new Date())) continue;
       const key = (r.paymentMethod || 'cash').toLowerCase();
       map.set(key, (map.get(key) ?? 0) + r.totals.grandTotal);
     }
     return [...map.entries()].sort((a, b) => b[1] - a[1]);
   });
 
-  readonly expenseBreakdown = computed(() => {
-    const map = new Map<string, number>();
-    for (const e of this.expenses()) {
-      if (!e.date || !this.isSameMonth(e.date, new Date())) continue;
-      const key = e.categoryId || 'uncategorized';
-      map.set(key, (map.get(key) ?? 0) + e.amount);
-    }
-    return [...map.entries()].sort((a, b) => b[1] - a[1]);
-  });
-
   readonly expiryAlerts = computed(() => {
     const now = new Date();
-    const in7 = new Date(now);
-    in7.setDate(in7.getDate() + 7);
     const in30 = new Date(now);
     in30.setDate(in30.getDate() + 30);
     return this.products().filter((p) => {
@@ -126,57 +164,90 @@ export class DashboardComponent {
       .slice(0, 6),
   );
 
-  readonly weeklyRevenue = computed((): WeekDayPoint[] => {
-    const points: WeekDayPoint[] = [];
-    const now = new Date();
-    for (let i = 6; i >= 0; i--) {
-      const day = new Date(now);
-      day.setDate(day.getDate() - i);
-      points.push({
-        label: day.toLocaleDateString('en-US', { weekday: 'short' }),
-        total: this.sumSalesForDay(day),
-      });
-    }
-    return points;
+  readonly periodRevenueByDay = computed((): DayPoint[] => {
+    const range = this.dateRange();
+    const days = eachDayInRange(range);
+    return days.map((day) => ({
+      label:
+        days.length <= 7
+          ? day.toLocaleDateString('en-US', { weekday: 'short' })
+          : day.toLocaleDateString('en-US', { day: 'numeric', month: 'short' }),
+      total: this.sumSalesForDay(day),
+    }));
   });
 
-  readonly chartLinePoints = computed(() => this.buildChartPoints(this.weeklyRevenue(), 560, 200, 24));
+  readonly chartLinePoints = computed(() =>
+    this.buildChartPoints(this.periodRevenueByDay(), 560, 200, 24),
+  );
   readonly chartAreaPath = computed(() => this.buildAreaPath(this.chartLinePoints()));
   readonly chartPolyline = computed(() => this.chartLinePoints().map((p) => `${p.x},${p.y}`).join(' '));
 
   readonly recentTransactions = computed(() => this.receipts().slice(0, 8));
   readonly totalReceiptCount = computed(() => this.receipts().length);
 
-  readonly todayLabel = computed(() =>
-    new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-  );
-
   constructor() {
-    void this.subscribeWhenAuthReady();
+    void this.initStaticData();
+
+    effect((onCleanup) => {
+      if (!this.authReady()) return;
+      const range = this.dateRange();
+      this.bindRangeData(range);
+      onCleanup(() => this.unbindRangeData());
+    });
   }
 
-  private async subscribeWhenAuthReady(): Promise<void> {
+  isPresetActive(preset: DateRangePreset): boolean {
+    return this.dateRange().preset === preset;
+  }
+
+  applyPreset(preset: DateRangePreset): void {
+    if (preset === 'custom') {
+      const from = parseDateInputValue(this.customFromInput());
+      const to = parseDateInputValue(this.customToInput());
+      if (from && to) {
+        this.dateRange.set(presetRange('custom', from, to));
+      } else {
+        const today = new Date();
+        this.customFromInput.set(toDateInputValue(today));
+        this.customToInput.set(toDateInputValue(today));
+        this.dateRange.set(presetRange('custom', today, today));
+      }
+      return;
+    }
+    this.dateRange.set(presetRange(preset));
+    const range = this.dateRange();
+    this.customFromInput.set(toDateInputValue(range.start));
+    this.customToInput.set(toDateInputValue(range.end));
+  }
+
+  onCustomFromChange(value: string): void {
+    this.customFromInput.set(value);
+  }
+
+  onCustomToChange(value: string): void {
+    this.customToInput.set(value);
+  }
+
+  applyCustomRange(): void {
+    const from = parseDateInputValue(this.customFromInput());
+    const to = parseDateInputValue(this.customToInput());
+    if (!from || !to) {
+      this.error.set('Select valid from and to dates.');
+      return;
+    }
+    this.error.set(null);
+    this.dateRange.set(presetRange('custom', from, to));
+  }
+
+  private async initStaticData(): Promise<void> {
     try {
       await this.auth.ensureSessionForDatabase();
+      this.authReady.set(true);
     } catch (e: unknown) {
       this.error.set(e instanceof Error ? e.message : 'Authentication required.');
       this.loading.set(false);
       return;
     }
-
-    this.receiptsService
-      .watchReceipts()
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: (rows) => {
-          this.receipts.set(rows);
-          this.loading.set(false);
-        },
-        error: (err: unknown) => {
-          this.error.set(mapDataErrorMessage(err));
-          this.loading.set(false);
-        },
-      });
 
     this.productsService
       .watchProducts()
@@ -194,14 +265,6 @@ export class DashboardComponent {
         error: () => {},
       });
 
-    this.expensesService
-      .watchExpenses()
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe({
-        next: (rows) => this.expenses.set(rows),
-        error: () => {},
-      });
-
     this.purchasesService
       .watchPurchases()
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -209,14 +272,42 @@ export class DashboardComponent {
         next: (rows) => this.purchases.set(rows),
         error: () => {},
       });
+  }
 
-    this.purchasePaymentsService
-      .watchPurchasePayments()
-      .pipe(takeUntilDestroyed(this.destroyRef))
+  private bindRangeData(range: DateRange): void {
+    this.unbindRangeData();
+    this.loading.set(true);
+    const { startMs, endMs } = rangeToMs(range);
+
+    const receiptsSub = this.receiptsService.watchReceiptsInRange(startMs, endMs).subscribe({
+      next: (rows) => {
+        this.receipts.set(rows);
+        this.loading.set(false);
+      },
+      error: (err: unknown) => {
+        this.error.set(mapDataErrorMessage(err));
+        this.loading.set(false);
+      },
+    });
+
+    const expensesSub = this.expensesService.watchExpensesInRange(startMs, endMs).subscribe({
+      next: (rows) => this.expenses.set(rows),
+      error: () => {},
+    });
+
+    const paymentsSub = this.purchasePaymentsService
+      .watchPurchasePaymentsInRange(startMs, endMs)
       .subscribe({
         next: (rows) => this.purchasePayments.set(rows),
         error: () => {},
       });
+
+    this.rangeSubs = [receiptsSub, expensesSub, paymentsSub];
+  }
+
+  private unbindRangeData(): void {
+    for (const sub of this.rangeSubs) sub.unsubscribe();
+    this.rangeSubs = [];
   }
 
   formatRs(amount: number): string {
@@ -238,15 +329,12 @@ export class DashboardComponent {
   }
 
   displayCustomer(c: ReceiptCustomerRef): string {
-    const name = c.mode === 'registered' ? c.fullName || 'Customer' : c.fullName || 'Guest';
-    return name;
+    return c.mode === 'registered' ? c.fullName || 'Customer' : c.fullName || 'Guest';
   }
 
   customerWithCredit(r: Receipt): string {
     const name = this.displayCustomer(r.customer);
-    if (r.totals.remainingAmount > 0) {
-      return `${name} (Udhaar)`;
-    }
+    if (r.totals.remainingAmount > 0) return `${name} (Udhaar)`;
     return name;
   }
 
@@ -278,76 +366,23 @@ export class DashboardComponent {
     return inv.startsWith('#') ? inv : `#${inv}`;
   }
 
-  private sumReceiptsForDay(day: Date, field: 'grandTotal' | 'totalProfit'): number {
-    return this.receipts()
-      .filter((r) => r.createdAt && this.isSameDay(r.createdAt, day))
-      .reduce((sum, r) => sum + (r.totals[field] ?? 0), 0);
-  }
-
-  private sumSupplierPaymentsForMonth(day: Date): number {
-    return this.purchasePayments()
-      .filter((p) => p.createdAt && this.isSameMonth(p.createdAt, day))
-      .reduce((sum, p) => sum + p.amount, 0);
-  }
-
-  private sumProfitForMonth(day: Date): number {
-    const products = this.products();
-    return this.receipts()
-      .filter((r) => r.createdAt && this.isSameMonth(r.createdAt, day))
-      .reduce((sum, r) => sum + this.profitForReceipt(r, products), 0);
-  }
-
   private profitForReceipt(r: Receipt, products: Product[]): number {
     const stored = r.totals.totalProfit;
-    if (stored !== 0 || r.lines.length === 0) {
-      return stored;
-    }
+    if (stored !== 0 || r.lines.length === 0) return stored;
     return computeReceiptProfitTotals(r.lines, products).totalProfit;
   }
 
-  private sumReceiptsForMonth(day: Date, field: 'grandTotal' | 'totalProfit'): number {
-    return this.receipts()
-      .filter((r) => r.createdAt && this.isSameMonth(r.createdAt, day))
-      .reduce((sum, r) => sum + (r.totals[field] ?? 0), 0);
-  }
-
-  private sumReceiptsLastDays(days: number, field: 'grandTotal' | 'totalProfit'): number {
-    const since = new Date();
-    since.setDate(since.getDate() - days);
-    return this.receipts()
-      .filter((r) => r.createdAt && r.createdAt >= since)
-      .reduce((sum, r) => sum + (r.totals[field] ?? 0), 0);
-  }
-
-  private sumExpensesForDay(day: Date): number {
-    return this.expenses()
-      .filter((e) => e.date && this.isSameDay(e.date, day))
-      .reduce((sum, e) => sum + e.amount, 0);
-  }
-
-  private sumExpensesForMonth(day: Date): number {
-    return this.expenses()
-      .filter((e) => e.date && this.isSameMonth(e.date, day))
-      .reduce((sum, e) => sum + e.amount, 0);
-  }
-
   private sumSalesForDay(day: Date): number {
-    return this.sumReceiptsForDay(day, 'grandTotal');
+    return this.receipts()
+      .filter((r) => r.createdAt && this.isSameDay(r.createdAt, day))
+      .reduce((sum, r) => sum + (r.totals.grandTotal ?? 0), 0);
   }
 
   private isSameDay(a: Date, b: Date): boolean {
-    return (
-      a.getFullYear() === b.getFullYear() &&
-      a.getMonth() === b.getMonth() &&
-      a.getDate() === b.getDate()
-    );
+    return startOfDay(a).getTime() === startOfDay(b).getTime();
   }
 
-  private isSameMonth(a: Date, b: Date): boolean {
-    return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth();
-  }
-
-  private buildChartPoints(data: WeekDayPoint[], width: number, height: number, pad: number): ChartPoint[] {
+  private buildChartPoints(data: DayPoint[], width: number, height: number, pad: number): ChartPoint[] {
     if (data.length === 0) return [];
     const max = Math.max(...data.map((d) => d.total), 1);
     const step = data.length > 1 ? (width - pad * 2) / (data.length - 1) : 0;

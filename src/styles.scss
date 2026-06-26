@@ -30,6 +30,15 @@
   --app-table-row-alt: #fafbfc;
   --app-row-warn-bg: #fffbeb;
   --app-adjust-bg: #f8fafc;
+  --app-card-bg: #ffffff;
+  --app-card-shadow: 0 1px 4px rgba(15, 23, 42, 0.04);
+  --app-chart-grid: #eef2f6;
+  --app-success-tint: #e8f4ec;
+  --app-error-bg: #fdf0ef;
+  --app-error-text: #c0392b;
+  --app-error-border: #f5c6cb;
+  --app-pill-danger-bg: #fef2f2;
+  --app-pill-warn-bg: #fff7ed;
   --login-page-bg: linear-gradient(155deg, #f1f5f9 0%, #e2e8f0 50%, #cbd5e1 100%);
 }
 
@@ -59,6 +68,15 @@ html.app-dark {
   --app-table-row-alt: #0f172a;
   --app-row-warn-bg: #422006;
   --app-adjust-bg: #1e293b;
+  --app-card-bg: #111827;
+  --app-card-shadow: 0 1px 4px rgba(0, 0, 0, 0.35);
+  --app-chart-grid: #1f2937;
+  --app-success-tint: rgba(45, 106, 79, 0.22);
+  --app-error-bg: rgba(127, 29, 29, 0.35);
+  --app-error-text: #fca5a5;
+  --app-error-border: rgba(248, 113, 113, 0.35);
+  --app-pill-danger-bg: rgba(127, 29, 29, 0.45);
+  --app-pill-warn-bg: rgba(124, 45, 18, 0.45);
   --login-page-bg: linear-gradient(155deg, #0f172a 0%, #1e293b 45%, #0f172a 100%);
 }
 
@@ -199,4 +217,112 @@ code {
   outline: none;
   border-color: color-mix(in srgb, var(--p-primary-color, #0ea5e9) 55%, var(--app-border));
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--p-primary-color, #0ea5e9) 18%, transparent);
+}
+
+/* PrimeNG dialogs are portaled to document body — theme them globally */
+.p-dialog-mask {
+  background: color-mix(in srgb, var(--app-main-bg) 35%, rgba(0, 0, 0, 0.45)) !important;
+}
+
+.p-dialog {
+  background: var(--app-card-bg) !important;
+  color: var(--app-text) !important;
+  border: 1px solid var(--app-border) !important;
+  box-shadow: var(--app-card-shadow) !important;
+}
+
+.p-dialog-header {
+  background: var(--app-card-bg) !important;
+  color: var(--app-text) !important;
+  border-bottom: 1px solid var(--app-border) !important;
+}
+
+.p-dialog-title {
+  color: var(--app-text) !important;
+}
+
+.p-dialog-header-actions .p-button {
+  color: var(--app-muted) !important;
+}
+
+.p-dialog-content {
+  background: var(--app-card-bg) !important;
+  color: var(--app-text) !important;
+}
+
+.p-dialog-footer {
+  background: var(--app-table-row-alt) !important;
+  border-top: 1px solid var(--app-border) !important;
+}
+
+.p-dialog .form-body {
+  background: var(--app-card-bg);
+  color: var(--app-text);
+}
+
+.p-dialog .form-actions {
+  background: var(--app-table-row-alt);
+  border-top: 1px solid var(--app-border);
+}
+
+.p-dialog .label,
+.p-dialog .preview-label,
+.p-dialog .sub-title {
+  color: var(--app-muted);
+}
+
+.p-dialog .hint,
+.p-dialog .hint-inline,
+.p-dialog .muted,
+.p-dialog .price-preview {
+  color: var(--app-muted);
+}
+
+.p-dialog .input,
+.p-dialog .select,
+.p-dialog textarea.input,
+.p-dialog .p-inputtext,
+.p-dialog .p-select,
+.p-dialog .p-select-label {
+  background: var(--app-toolbar-bg) !important;
+  border-color: var(--app-border) !important;
+  color: var(--app-text) !important;
+}
+
+.p-dialog .card-inner,
+.p-dialog .preview-box,
+.p-dialog .count-card,
+.p-dialog .stock-entry {
+  background: var(--app-table-row-alt);
+  border-color: var(--app-border);
+  color: var(--app-text);
+}
+
+.p-dialog .hint-inline {
+  background: var(--app-success-tint);
+  border-left-color: #2d6a4f;
+}
+
+.p-dialog code {
+  background: color-mix(in srgb, var(--app-muted) 12%, transparent);
+  color: var(--app-text);
+}
+
+.p-dialog .p-message {
+  margin: 0 1.25rem 1rem !important;
+}
+
+.info-banner {
+  margin-bottom: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  background: var(--app-card-bg);
+  border: 1px solid var(--app-border);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--app-text);
+
+  code {
+    font-size: 0.85em;
+  }
 }

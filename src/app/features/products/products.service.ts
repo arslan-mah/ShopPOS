@@ -118,6 +118,16 @@ export function baseStockToDisplayQuantity(
   return stockInBaseUnit;
 }
 
+/** Total stock value at purchase cost (cost × qty in selling unit / pieces). */
+export function productInventoryValue(p: Product): number {
+  if (p.cost <= 0 || p.stockInBaseUnit <= 0) return 0;
+  if (p.type === 'count') {
+    return p.stockInBaseUnit * p.cost;
+  }
+  const cf = p.conversionFactor > 0 ? p.conversionFactor : 1;
+  return (p.stockInBaseUnit / cf) * p.cost;
+}
+
 @Injectable({ providedIn: 'root' })
 export class ProductsService {
   private readonly db = inject(REALTIME_DATABASE);

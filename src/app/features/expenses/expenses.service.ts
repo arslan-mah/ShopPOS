@@ -1,5 +1,7 @@
 import { inject, Injectable } from '@angular/core';
 import {
+  endAt,
+  get,
   onValue,
   orderByChild,
   push,
@@ -8,6 +10,7 @@ import {
   remove,
   serverTimestamp,
   set,
+  startAt,
   update,
 } from 'firebase/database';
 import { Observable } from 'rxjs';
@@ -47,6 +50,20 @@ export class ExpensesService {
 
   watchExpenses(): Observable<Expense[]> {
     const q = query(ref(this.db, 'expenses'), orderByChild('createdAt'));
+    return this.watchExpensesQuery(q);
+  }
+
+  watchExpensesInRange(startMs: number, endMs: number): Observable<Expense[]> {
+    const q = query(
+      ref(this.db, 'expenses'),
+      orderByChild('date'),
+      startAt(startMs),
+      endAt(endMs),
+    );
+    return this.watchExpensesQuery(q);
+  }
+
+  private watchExpensesQuery(q: ReturnType<typeof query>): Observable<Expense[]> {
     return new Observable((subscriber) => {
       const unsub = onValue(
         q,

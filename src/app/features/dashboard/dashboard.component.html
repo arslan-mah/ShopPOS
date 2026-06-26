@@ -2,61 +2,92 @@
   <header class="dash-header">
     <div>
       <h1 class="dash-title">Store Overview</h1>
-      <p class="dash-subtitle">Welcome back! Here's what's happening today.</p>
+      <p class="dash-subtitle">Statistics for <strong>{{ rangeLabel() }}</strong></p>
     </div>
     <div class="dash-header-actions">
-      <span class="date-pill">{{ todayLabel() }}</span>
       <a routerLink="/products" class="add-product-btn">+ Add Product</a>
     </div>
   </header>
 
+  <section class="range-toolbar panel">
+    <div class="range-shortcuts">
+      @for (s of rangeShortcuts; track s.preset) {
+        <button
+          type="button"
+          class="range-btn"
+          [class.active]="isPresetActive(s.preset)"
+          (click)="applyPreset(s.preset)"
+        >
+          {{ s.label }}
+        </button>
+      }
+    </div>
+
+    @if (isPresetActive('custom')) {
+      <div class="custom-range-row">
+        <label class="date-field">
+          <span class="field-label">From</span>
+          <input
+            class="input date-input"
+            type="date"
+            [value]="customFromInput()"
+            (change)="onCustomFromChange($any($event.target).value)"
+          />
+        </label>
+        <label class="date-field">
+          <span class="field-label">To</span>
+          <input
+            class="input date-input"
+            type="date"
+            [value]="customToInput()"
+            (change)="onCustomToChange($any($event.target).value)"
+          />
+        </label>
+        <button type="button" class="apply-range-btn" (click)="applyCustomRange()">Apply range</button>
+      </div>
+    }
+  </section>
+
   @if (error()) {
     <div class="error-banner">{{ error() }}</div>
+  }
+
+  @if (loading()) {
+    <div class="loading-banner">Loading statistics…</div>
   }
 
   <section class="metrics-grid">
     <article class="metric-card">
       <div class="metric-top">
         <span class="metric-icon">💰</span>
-        <span class="metric-trend up">+12% ↑</span>
       </div>
-      <div class="metric-label">Today's Sales</div>
-      <div class="metric-value">{{ formatRs(todaySales()) }}</div>
-    </article>
-
-    <article class="metric-card">
-      <div class="metric-top">
-        <span class="metric-icon">📈</span>
-        <span class="metric-trend up">+5% ↑</span>
-      </div>
-      <div class="metric-label">Monthly Sales</div>
-      <div class="metric-value">{{ formatRs(monthlySales()) }}</div>
+      <div class="metric-label">Sales (period)</div>
+      <div class="metric-value">{{ formatRs(periodSales()) }}</div>
     </article>
 
     <article class="metric-card">
       <div class="metric-top">
         <span class="metric-icon">💵</span>
       </div>
-      <div class="metric-label">Gross Profit (Month)</div>
-      <div class="metric-value profit">{{ formatRs(monthlyGrossProfit()) }}</div>
+      <div class="metric-label">Gross Profit (period)</div>
+      <div class="metric-value profit">{{ formatRs(periodGrossProfit()) }}</div>
     </article>
 
     <article class="metric-card">
       <div class="metric-top">
         <span class="metric-icon">🧾</span>
       </div>
-      <div class="metric-label">Expenses (Month)</div>
-      <div class="metric-value">{{ formatRs(monthlyExpenses()) }}</div>
-      <div class="metric-sub">Today: {{ formatRs(todayExpenses()) }}</div>
+      <div class="metric-label">Expenses (period)</div>
+      <div class="metric-value">{{ formatRs(periodExpenses()) }}</div>
     </article>
 
     <article class="metric-card">
       <div class="metric-top">
         <span class="metric-icon">📊</span>
       </div>
-      <div class="metric-label">Net Profit (Month)</div>
-      <div class="metric-value" [class.profit]="monthlyNetProfit() >= 0" [class.danger]="monthlyNetProfit() < 0">
-        {{ formatRs(monthlyNetProfit()) }}
+      <div class="metric-label">Net Profit (period)</div>
+      <div class="metric-value" [class.profit]="periodNetProfit() >= 0" [class.danger]="periodNetProfit() < 0">
+        {{ formatRs(periodNetProfit()) }}
       </div>
     </article>
 
@@ -66,16 +97,25 @@
       </div>
       <div class="metric-label">Total Customers</div>
       <div class="metric-value">{{ totalCustomers() }}</div>
-      <div class="metric-sub">{{ newCustomersThisMonth() }} new this month</div>
+      <div class="metric-sub">{{ newCustomersInPeriod() }} new in period</div>
     </article>
 
     <article class="metric-card">
       <div class="metric-top">
         <span class="metric-icon">🚚</span>
       </div>
-      <div class="metric-label">Purchases Paid (Month)</div>
-      <div class="metric-value">{{ formatRs(monthlyPurchasePaid()) }}</div>
-      <div class="metric-sub muted-text">Cash paid to suppliers for stock</div>
+      <div class="metric-label">Purchases Paid (period)</div>
+      <div class="metric-value">{{ formatRs(periodPurchasePaid()) }}</div>
+      <div class="metric-sub muted-text">Cash paid to suppliers</div>
+    </article>
+
+    <article class="metric-card">
+      <div class="metric-top">
+        <span class="metric-icon">📦</span>
+      </div>
+      <div class="metric-label">Stock Value (at cost)</div>
+      <div class="metric-value">{{ formatRs(totalInventoryValue()) }}</div>
+      <div class="metric-sub muted-text">All products on hand</div>
     </article>
 
     <article class="metric-card alert-card">
@@ -84,7 +124,7 @@
       </div>
       <div class="metric-label">Supplier Credit</div>
       <div class="metric-value danger">{{ formatRs(supplierCreditOutstanding()) }}</div>
-      <div class="metric-sub danger-text">Owed to suppliers</div>
+      <div class="metric-sub danger-text">Current outstanding</div>
     </article>
 
     <article class="metric-card alert-card">
@@ -93,25 +133,27 @@
       </div>
       <div class="metric-label">Low Stock</div>
       <div class="metric-value danger">{{ lowStockCount() }}</div>
-      <div class="metric-sub danger-text">Action Required</div>
+      <div class="metric-sub danger-text">Action required</div>
     </article>
   </section>
 
   <section class="middle-grid">
     <article class="panel chart-panel">
       <div class="panel-head">
-        <h2 class="panel-title">Weekly Revenue Analytics</h2>
-        <span class="panel-select">Last 7 Days</span>
+        <h2 class="panel-title">Revenue by day</h2>
+        <span class="panel-select">{{ rangeLabel() }}</span>
       </div>
       @if (loading()) {
         <div class="panel-empty">Loading chart…</div>
+      } @else if (periodRevenueByDay().length === 0) {
+        <div class="panel-empty">No sales in this period.</div>
       } @else {
         <div class="chart-wrap">
           <svg class="revenue-chart" viewBox="0 0 560 200" preserveAspectRatio="none" aria-hidden="true">
             <defs>
               <linearGradient id="chartFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stop-color="#2d6a4f" stop-opacity="0.25" />
-                <stop offset="100%" stop-color="#2d6a4f" stop-opacity="0.02" />
+                <stop offset="0%" stop-color="#4ade80" stop-opacity="0.28" />
+                <stop offset="100%" stop-color="#4ade80" stop-opacity="0.02" />
               </linearGradient>
             </defs>
             @for (y of [0, 1, 2, 3, 4]; track y) {
@@ -123,8 +165,8 @@
               <circle class="chart-dot" [attr.cx]="p.x" [attr.cy]="p.y" r="4" />
             }
           </svg>
-          <div class="chart-labels">
-            @for (d of weeklyRevenue(); track d.label + $index) {
+          <div class="chart-labels" [style.grid-template-columns]="'repeat(' + periodRevenueByDay().length + ', 1fr)'">
+            @for (d of periodRevenueByDay(); track d.label + $index) {
               <span>{{ d.label }}</span>
             }
           </div>
@@ -160,7 +202,7 @@
     <article class="panel">
       <div class="panel-head"><h2 class="panel-title">Top Selling Products</h2></div>
       @if (topSellingProducts().length === 0) {
-        <div class="panel-empty">No sales data yet.</div>
+        <div class="panel-empty">No sales in this period.</div>
       } @else {
         <ul class="rank-list">
           @for (p of topSellingProducts(); track p.id) {
@@ -170,12 +212,16 @@
       }
     </article>
     <article class="panel">
-      <div class="panel-head"><h2 class="panel-title">Payment Methods (Month)</h2></div>
-      <ul class="rank-list">
-        @for (row of paymentBreakdown(); track row[0]) {
-          <li><span>{{ row[0] }}</span><strong>{{ formatRs(row[1]) }}</strong></li>
-        }
-      </ul>
+      <div class="panel-head"><h2 class="panel-title">Payment Methods</h2></div>
+      @if (paymentBreakdown().length === 0) {
+        <div class="panel-empty">No payments in this period.</div>
+      } @else {
+        <ul class="rank-list">
+          @for (row of paymentBreakdown(); track row[0]) {
+            <li><span>{{ row[0] }}</span><strong>{{ formatRs(row[1]) }}</strong></li>
+          }
+        </ul>
+      }
     </article>
     <article class="panel">
       <div class="panel-head"><h2 class="panel-title">Expiry Alerts</h2></div>
@@ -190,24 +236,23 @@
       }
     </article>
     <article class="panel">
-      <div class="panel-head"><h2 class="panel-title">30-Day Revenue</h2></div>
-      <div class="big-stat">{{ formatRs(revenueLast30Days()) }}</div>
+      <div class="panel-head"><h2 class="panel-title">Period Revenue</h2></div>
+      <div class="big-stat">{{ formatRs(periodSales()) }}</div>
     </article>
   </section>
 
   <section class="panel transactions-panel">
     <div class="panel-head">
-      <h2 class="panel-title">Recent Transactions</h2>
+      <h2 class="panel-title">Transactions in period</h2>
       <div class="panel-actions">
-        <a routerLink="/receipts" class="ghost-btn">Filters</a>
-        <a routerLink="/receipts" class="ghost-btn">Export</a>
+        <a routerLink="/receipts" class="ghost-btn">View all receipts</a>
       </div>
     </div>
 
     @if (loading() && recentTransactions().length === 0) {
       <div class="panel-empty">Loading transactions…</div>
     } @else if (recentTransactions().length === 0) {
-      <div class="panel-empty">No transactions yet. Create sales from Point of Sale.</div>
+      <div class="panel-empty">No transactions in this period.</div>
     } @else {
       <div class="table-wrap">
         <table class="txn-table">
@@ -253,7 +298,7 @@
         </table>
       </div>
       <div class="table-footer">
-        <span class="muted">Showing {{ recentTransactions().length }} of {{ totalReceiptCount() }} transactions</span>
+        <span class="muted">Showing {{ recentTransactions().length }} of {{ totalReceiptCount() }} in period</span>
         <a routerLink="/receipts" class="ghost-btn">View all receipts →</a>
       </div>
     }
